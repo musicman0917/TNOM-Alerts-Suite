@@ -228,6 +228,81 @@ function broadcastGiveaway(payload) {
   }
 }
 
+// Shared giveaway actions — called from both the admin HTTP endpoints and
+// the !giveaway chat commands, so both surfaces always behave identically.
+function giveawayStart(keyword) {
+  giveawayState.active  = true;
+  giveawayState.keyword = (keyword && keyword.trim()) || '!enter';
+  giveawayState.entries = [];
+  giveawayState.winner  = null;
+  saveGiveawayState();
+  broadcastGiveaway({ status: 'started', keyword: giveawayState.keyword, count: 0 });
+  sendChatMessage(`🎉 Giveaway started! Type ${giveawayState.keyword} in chat to enter!`);
+  console.log(`[giveaway] Started — keyword: ${giveawayState.keyword}`);
+}
+
+function giveawayCloseEntries() {
+  giveawayState.active = false;
+  saveGiveawayState();
+  broadcastGiveaway({ status: 'stopped', keyword: giveawayState.keyword, count: giveawayState.entries.length });
+  sendChatMessage(`🔒 Giveaway entries are closed! ${giveawayState.entries.length} entered — winner coming soon!`);
+  console.log(`[giveaway] Entries closed — ${giveawayState.entries.length} total`);
+}
+
+function giveawayDraw() {
+  if (!giveawayState.entries.length) return null;
+  const winner     = giveawayState.entries[Math.floor(Math.random() * giveawayState.entries.length)];
+  const entryCount = giveawayState.entries.length;
+  giveawayState.active = false;
+  giveawayState.winner = winner;
+  saveGiveawayState();
+  broadcastGiveaway({
+    status:  'drawing',
+    keyword: giveawayState.keyword,
+    count:   entryCount,
+    entries: giveawayState.entries.map(e => e.username),
+    winner:  winner.username,
+  });
+  sendChatMessage(`🏆 The giveaway winner is @${winner.username}! Congratulations! 🎉`);
+  announceGiveawayWinnerToDiscord(winner, giveawayState.keyword, entryCount);
+  console.log(`[giveaway] Winner drawn: ${winner.username} (from ${entryCount} entries)`);
+  return winner;
+}
+
+function giveawayReset() {
+  giveawayState.active  = false;
+  giveawayState.entries = [];
+  giveawayState.winner  = null;
+  saveGiveawayState();
+  broadcastGiveaway({ status: 'reset' });
+  console.log('[giveaway] Reset');
+}
+
+function giveawayRemoveEntrant(username) {
+  const target = (username || '').trim().replace(/^@/, '').toLowerCase();
+  if (!target) return false;
+  const before = giveawayState.entries.length;
+  giveawayState.entries = giveawayState.entries.filter(e => e.username.toLowerCase() !== target);
+  const removed = giveawayState.entries.length !== before;
+  if (removed) {
+    saveGiveawayState();
+    broadcastGiveaway({
+      status:  giveawayState.active ? 'active' : 'stopped',
+      keyword: giveawayState.keyword,
+      count:   giveawayState.entries.length,
+    });
+    console.log(`[giveaway] Removed entrant: ${target}`);
+  }
+  return removed;
+}
+
+// A chatter counts as a giveaway moderator if they're the broadcaster or
+// carry the moderator badge on this message.
+function isGiveawayMod(event) {
+  if (event.chatter_user_id === BROADCASTER_ID) return true;
+  return (event.badges || []).some(b => b.set_id === 'moderator');
+}
+
 // ─── Integrations (Discord webhook, etc.) ──────────────────────────────────
 const INTEGRATIONS_FILE = path.join(__dirname, '.integrations.json');
 let integrations = { discordWebhookUrl: '' };
@@ -742,16 +817,45 @@ function routeTwitchEvent(subType, event) {
       break;
 
     case 'channel.chat.message': {
-      if (!giveawayState.active) break;
-      const text = (event.message?.text || '').trim().toLowerCase();
-      if (text !== giveawayState.keyword.toLowerCase()) break;
-      const userId   = event.chatter_user_id;
-      const username = event.chatter_user_name;
-      if (giveawayState.entries.some(e => e.userId === userId)) break; // one entry per viewer
-      giveawayState.entries.push({ userId, username });
-      saveGiveawayState();
-      broadcastGiveaway({ status: 'active', keyword: giveawayState.keyword, count: giveawayState.entries.length });
-      console.log(`[giveaway] ${username} entered (${giveawayState.entries.length} total)`);
+      const rawText = (event.message?.text || '').trim();
+      const text    = rawText.toLowerCase();
+
+      // Entry keyword — anyone, only while a giveaway is actively collecting.
+      if (giveawayState.active && text === giveawayState.keyword.toLowerCase()) {
+        const userId   = event.chatter_user_id;
+        const username = event.chatter_user_name;
+        if (giveawayState.entries.some(e => e.userId === userId)) break; // one entry per viewer
+        giveawayState.entries.push({ userId, username });
+        saveGiveawayState();
+        broadcastGiveaway({ status: 'active', keyword: giveawayState.keyword, count: giveawayState.entries.length });
+        console.log(`[giveaway] ${username} entered (${giveawayState.entries.length} total)`);
+        break;
+      }
+
+      // Mod/broadcaster commands: !giveaway start|stop|close|draw|reset|remove <user>
+      if (text.startsWith('!giveaway ')) {
+        if (!isGiveawayMod(event)) {
+          console.log(`[giveaway] Ignored !giveaway command from non-mod: ${event.chatter_user_name}`);
+          break;
+        }
+        const parts  = rawText.slice('!giveaway '.length).trim().split(/\s+/);
+        const action = (parts[0] || '').toLowerCase();
+        const arg    = parts.slice(1).join(' ');
+
+        if (action === 'start') {
+          giveawayStart(arg);
+        } else if (action === 'stop' || action === 'close') {
+          giveawayCloseEntries();
+        } else if (action === 'draw') {
+          if (!giveawayDraw()) sendChatMessage("No entries yet — can't draw a winner.");
+        } else if (action === 'reset') {
+          giveawayReset();
+        } else if (action === 'remove') {
+          giveawayRemoveEntrant(arg);
+        }
+        console.log(`[giveaway] !giveaway ${action} by ${event.chatter_user_name}`);
+        break;
+      }
       break;
     }
   }
@@ -1294,14 +1398,7 @@ const server = http.createServer(async (req, res) => {
     req.on('end', () => {
       try {
         const { keyword } = JSON.parse(body || '{}');
-        giveawayState.active  = true;
-        giveawayState.keyword = (keyword && keyword.trim()) || '!enter';
-        giveawayState.entries = [];
-        giveawayState.winner  = null;
-        saveGiveawayState();
-        broadcastGiveaway({ status: 'started', keyword: giveawayState.keyword, count: 0 });
-        sendChatMessage(`🎉 Giveaway started! Type ${giveawayState.keyword} in chat to enter!`);
-        console.log(`[giveaway] Started — keyword: ${giveawayState.keyword}`);
+        giveawayStart(keyword);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, giveaway: giveawayState }));
       } catch (e) {
@@ -1314,11 +1411,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /giveaway-stop ─────────────────────────────────────
   if (pathname === '/giveaway-stop' && req.method === 'POST') {
-    giveawayState.active = false;
-    saveGiveawayState();
-    broadcastGiveaway({ status: 'stopped', keyword: giveawayState.keyword, count: giveawayState.entries.length });
-    sendChatMessage(`🔒 Giveaway entries are closed! ${giveawayState.entries.length} entered — winner coming soon!`);
-    console.log(`[giveaway] Entries closed — ${giveawayState.entries.length} total`);
+    giveawayCloseEntries();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, giveaway: giveawayState }));
     return;
@@ -1326,26 +1419,12 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /giveaway-draw ─────────────────────────────────────
   if (pathname === '/giveaway-draw' && req.method === 'POST') {
-    if (!giveawayState.entries.length) {
+    const winner = giveawayDraw();
+    if (!winner) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'No entries to draw from' }));
       return;
     }
-    const winner     = giveawayState.entries[Math.floor(Math.random() * giveawayState.entries.length)];
-    const entryCount = giveawayState.entries.length;
-    giveawayState.active = false;
-    giveawayState.winner = winner;
-    saveGiveawayState();
-    broadcastGiveaway({
-      status:  'drawing',
-      keyword: giveawayState.keyword,
-      count:   entryCount,
-      entries: giveawayState.entries.map(e => e.username),
-      winner:  winner.username,
-    });
-    sendChatMessage(`🏆 The giveaway winner is @${winner.username}! Congratulations! 🎉`);
-    announceGiveawayWinnerToDiscord(winner, giveawayState.keyword, entryCount);
-    console.log(`[giveaway] Winner drawn: ${winner.username} (from ${entryCount} entries)`);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, winner }));
     return;
@@ -1353,12 +1432,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /giveaway-reset ────────────────────────────────────
   if (pathname === '/giveaway-reset' && req.method === 'POST') {
-    giveawayState.active  = false;
-    giveawayState.entries = [];
-    giveawayState.winner  = null;
-    saveGiveawayState();
-    broadcastGiveaway({ status: 'reset' });
-    console.log('[giveaway] Reset');
+    giveawayReset();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true }));
     return;
