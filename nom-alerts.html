@@ -1518,6 +1518,12 @@ const THEME_OVERRIDES = {
       sub:    ()     => 'The neighborhood grows! Welcome, all! 🏰',
       color:  '#6C3483',
     },
+    raid_out: {
+      icon:   '🏰',
+      action: (u,a)  => `Bringing ${a} neighbors to visit ${u}!`,
+      sub:    ()     => 'Off to spread the love! 🏰',
+      color:  '#6C3483',
+    },
     tip: {
       icon:   '💫',
       action: (u,a)  => `${u} left a gift for the neighborhood!`,
@@ -1677,6 +1683,15 @@ const CONFIGS = {
     label:   'Incoming Raid',
     action:  (u,a) => `${u} raids with ${a||10}!`,
     sub:     ()    => 'The tavern erupts in cheers!',
+    color:   '#E06830',
+    dur:     7000,
+  },
+  raid_out: {
+    icon:    null,
+    iconUrl: () => 'Assets/raid.gif',
+    label:   'Outgoing Raid',
+    action:  (u,a) => `Raiding ${u} with ${a||10}!`,
+    sub:     ()    => 'Take the party to their tavern!',
     color:   '#E06830',
     dur:     7000,
   },

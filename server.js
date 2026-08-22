@@ -361,6 +361,7 @@ function eventsubSubscriptions(sessionId, broadcasterId) {
     { type: 'channel.subscription.message', version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.cheer',             version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.raid',              version: '1', condition: { to_broadcaster_user_id: broadcasterId } },
+    { type: 'channel.raid',              version: '1', condition: { from_broadcaster_user_id: broadcasterId } },
     { type: 'channel.poll.begin',        version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.poll.progress',     version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.poll.end',          version: '1', condition: { broadcaster_user_id: broadcasterId } },
@@ -553,13 +554,25 @@ function routeTwitchEvent(subType, event) {
       break;
 
     case 'channel.raid':
-      broadcastAlert({
-        type:     'raid',
-        username: event.from_broadcaster_user_name,
-        amount:   event.viewers,
-        _real:    true,
-      });
-      console.log(`[twitch] ${event.from_broadcaster_user_name} raided with ${event.viewers} viewers`);
+      if (event.from_broadcaster_user_id === BROADCASTER_ID) {
+        // Outgoing raid — we raided someone else
+        broadcastAlert({
+          type:     'raid_out',
+          username: event.to_broadcaster_user_name,
+          amount:   event.viewers,
+          _real:    true,
+        });
+        console.log(`[twitch] Raided ${event.to_broadcaster_user_name} with ${event.viewers} viewers`);
+      } else {
+        // Incoming raid — someone raided us
+        broadcastAlert({
+          type:     'raid',
+          username: event.from_broadcaster_user_name,
+          amount:   event.viewers,
+          _real:    true,
+        });
+        console.log(`[twitch] ${event.from_broadcaster_user_name} raided with ${event.viewers} viewers`);
+      }
       break;
 
     case 'channel.goal.begin':
