@@ -263,7 +263,11 @@ function giveawayDraw() {
     entries: giveawayState.entries.map(e => e.username),
     winner:  winner.username,
   });
-  sendChatMessage(`🏆 The giveaway winner is @${winner.username}! Congratulations! 🎉`);
+  const discordHandle = socialConfig.find(s => s.label === 'Discord')?.handle;
+  const claimNote = discordHandle
+    ? ` You MUST be in our Discord (${discordHandle}) to claim your prize!`
+    : ' You MUST be in our Discord to claim your prize!';
+  sendChatMessage(`🏆 The giveaway winner is @${winner.username}! Congratulations! 🎉${claimNote}`);
   announceGiveawayWinnerToDiscord(winner, giveawayState.keyword, entryCount);
   console.log(`[giveaway] Winner drawn: ${winner.username} (from ${entryCount} entries)`);
   return winner;
