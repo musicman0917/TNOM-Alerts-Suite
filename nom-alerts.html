@@ -2126,12 +2126,17 @@ function renderAlert({ type, username, amount, message, goal }) {
   // Floating notes
   spawnNotes(10);
 
-  // Progress bar
+  // Progress bar — meaningless for a card with no auto-hide, so hide it
   const prog = document.getElementById('progress');
-  prog.style.animation = 'none';
-  void prog.offsetWidth;
-  prog.style.setProperty('--pdur', cfg.dur + 'ms');
-  prog.style.animation = '';
+  if (type === 'raid_out') {
+    prog.style.display = 'none';
+  } else {
+    prog.style.display = '';
+    prog.style.animation = 'none';
+    void prog.offsetWidth;
+    prog.style.setProperty('--pdur', cfg.dur + 'ms');
+    prog.style.animation = '';
+  }
 
   // Sound
   playAlertSound(type, amount);
@@ -2141,6 +2146,14 @@ function renderAlert({ type, username, amount, message, goal }) {
   void card.offsetWidth;
   card.classList.add('enter');
 
+  // Outgoing raid is a parting shot — pin it up through the rest of the
+  // stream instead of auto-advancing the queue. Cleared via the admin
+  // panel's "Clear Raid Card" button (or the panic button).
+  if (type === 'raid_out') {
+    raidCardPinned = true;
+    return;
+  }
+
   setTimeout(() => {
     card.classList.remove('enter');
     card.classList.add('exit');
@@ -2149,6 +2162,21 @@ function renderAlert({ type, username, amount, message, goal }) {
       next();
     }, 420);
   }, cfg.dur);
+}
+
+let raidCardPinned = false;
+
+function clearRaidCard() {
+  if (!raidCardPinned) return;
+  raidCardPinned = false;
+  const card = document.getElementById('card');
+  card.classList.remove('enter');
+  card.classList.add('exit');
+  setTimeout(() => {
+    card.classList.remove('exit');
+    document.getElementById('progress').style.display = '';
+    next();
+  }, 420);
 }
 
 // ─── Waveform Builder ──────────────────────────────────────────────────────
@@ -2272,8 +2300,15 @@ function connectAlertBus() {
       if (alertsPaused) {
         queue.length = 0; // clear any pending alerts immediately
         updateQueueInfo();
+        clearRaidCard();
       }
       console.log(`[panic] Alerts ${alertsPaused ? 'PAUSED' : 'resumed'}`);
+      return;
+    }
+
+    // Manually dismiss a pinned outgoing-raid card
+    if (payload.type === 'clear-raid-card') {
+      clearRaidCard();
       return;
     }
 

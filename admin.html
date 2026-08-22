@@ -275,6 +275,7 @@
       <button onclick="test('bits')"><span class="icon">◆</span> Bits</button>
       <button onclick="test('raid')"><span class="icon">⚔</span> Raid</button>
       <button onclick="test('raid_out')"><span class="icon">🏰</span> Outgoing Raid</button>
+      <button onclick="clearRaidCard()" class="danger"><span class="icon">✖</span> Clear Raid Card</button>
       <button onclick="test('tip')"><span class="icon">✦</span> Tip</button>
       <button onclick="testShoutout()"><span class="icon">📣</span> Shoutout</button>
     </div>
@@ -668,6 +669,20 @@ function test(type) {
 function testShoutout() {
   sendShoutoutToOverlay('neighborhoodofmusic', null, null);
   addLog('Test shoutout fired: neighborhoodofmusic', 'ok');
+}
+
+async function clearRaidCard() {
+  try {
+    const res = await fetch(`${OVERLAY_URL}/fire-alert`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ type: 'clear-raid-card' }),
+    });
+    if (res.ok) addLog('Raid card cleared', 'ok');
+    else addLog(`Clear failed: ${res.status}`, 'error');
+  } catch (e) {
+    addLog(`Clear error: ${e.message}`, 'error');
+  }
 }
 
 function fireCustom() {
