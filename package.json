@@ -1,0 +1,16 @@
+{
+  "name": "nom-token-broker",
+  "version": "1.0.0",
+  "description": "Twitch EventSub + token broker + static file server for NOM Alerts",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "ws": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

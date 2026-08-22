@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NOM Alerts — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  :root {
+    --card-bg-a: #2A1508;
+    --card-bg-b: #180C04;
+    --border:    #B87820;
+    --amber:     #E89010;
+    --gold:      #D4A840;
+    --warm:      #F0C060;
+    --cream:     #F2E4CC;
+    --muted:     #C0986A;
+    --dark-muted:#8A6040;
+    --glow-rgba: rgba(232,144,16,0.35);
+  }
+
+  html, body {
+    min-height: 100vh;
+    background:
+      repeating-linear-gradient(93deg,
+        transparent 0px, rgba(255,200,100,.012) 1px,
+        transparent 2px, transparent 12px),
+      linear-gradient(160deg, #1E0E04 0%, #120804 60%, #0E0602 100%);
+    color: var(--cream);
+    font-family: 'Crimson Pro', serif;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid #B8782044;
+    padding: 24px 40px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 {
+    font-family: 'Cinzel', serif;
+    font-size: 15px; letter-spacing: .25em;
+    color: var(--amber);
+  }
+  header .status-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(0,0,0,.4);
+    border: 1px solid #B8782044;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px; font-style: italic;
+    color: var(--muted);
+  }
+
+  /* ── Layout ── */
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .full { grid-column: 1 / -1; }
+
+  /* ── Section cards ── */
+  .panel {
+    background: linear-gradient(155deg, var(--card-bg-a), var(--card-bg-b));
+    border: 1px solid #B8782044;
+    border-radius: 4px;
+    padding: 24px;
+    position: relative;
+  }
+  .panel::before {
+    content: '';
+    position: absolute; inset: -1px;
+    border-radius: 4px;
+    pointer-events: none;
+  }
+  .panel-title {
+    font-family: 'Cinzel', serif;
+    font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #B8782033;
+  }
+
+  /* ── Buttons ── */
+  .btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .btn-grid.single { grid-template-columns: 1fr; }
+
+  button {
+    background: linear-gradient(135deg, #2A1508, #180C04);
+    border: 1px solid #B8782055;
+    border-radius: 3px;
+    color: var(--cream);
+    font-family: 'Cinzel', serif;
+    font-size: 11px; letter-spacing: .1em;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+    text-align: left;
+    display: flex; align-items: center; gap: 8px;
+  }
+  button:hover {
+    border-color: var(--amber);
+    box-shadow: 0 0 12px var(--glow-rgba);
+    background: linear-gradient(135deg, #3A2010, #2A1508);
+  }
+  button.danger {
+    border-color: #E0302055;
+    color: #E07060;
+  }
+  button.danger:hover {
+    border-color: #E03020;
+    box-shadow: 0 0 12px rgba(224,48,32,.35);
+  }
+  button .icon { font-size: 15px; }
+
+  /* ── Inputs ── */
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block;
+    font-family: 'Cinzel', serif;
+    font-size: 9px; letter-spacing: .15em; text-transform: uppercase;
+    color: var(--dark-muted);
+    margin-bottom: 5px;
+  }
+  .field input, .field select {
+    width: 100%;
+    background: rgba(0,0,0,.4);
+    border: 1px solid #B8782044;
+    border-radius: 3px;
+    color: var(--cream);
+    font-family: 'Crimson Pro', serif;
+    font-size: 14px;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--amber);
+  }
+  .field select option { background: #1E0E04; }
+
+  /* ── Log ── */
+  #log {
+    background: rgba(0,0,0,.5);
+    border: 1px solid #B8782033;
+    border-radius: 3px;
+    padding: 12px;
+    height: 180px;
+    overflow-y: auto;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  #log .entry { margin-bottom: 2px; }
+  #log .entry.event  { color: var(--warm); }
+  #log .entry.ok     { color: #7EC87E; }
+  #log .entry.warn   { color: #E89010; }
+  #log .entry.error  { color: #E07060; }
+
+  /* ── Queue display ── */
+  #queue-display {
+    font-style: italic;
+    color: var(--dark-muted);
+    font-size: 13px;
+    min-height: 20px;
+    margin-top: 8px;
+  }
+
+  /* ── Token status ── */
+  .token-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: rgba(0,0,0,.3);
+    border: 1px solid #B8782033;
+    border-radius: 3px;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+  .token-row .dot { font-size: 10px; }
+
+  /* ── Divider ── */
+  hr {
+    border: none;
+    border-top: 1px solid #B8782022;
+    margin: 14px 0;
+  }
+</style>
+<script src="config.js"></script>
+</head>
+<body>
+
+<header>
+  <h1>♩ NOM ALERTS — ADMIN ♩</h1>
+  <div class="status-pill">
+    <span id="sb-dot">🟡</span>
+    <span id="sb-status">Connecting to Streamer.bot…</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Panic Button ── -->
+  <div class="panel full" style="border-color:#E03020;">
+    <div class="panel-title" style="color:#E03020;display:flex;justify-content:space-between;align-items:center;">
+      <span>🚨 Panic Button</span>
+      <span id="panic-status" style="font-family:'Crimson Pro',serif;font-size:13px;font-style:italic;color:var(--dark-muted);">Alerts: Active</span>
+    </div>
+    <p style="font-family:'Crimson Pro',serif;font-size:13px;color:var(--dark-muted);margin-bottom:10px;font-style:italic;">
+      In the event of a hate raid, hit this to instantly stop all incoming alerts on every overlay. Hit again to resume.
+    </p>
+    <button id="panic-btn" onclick="togglePanic()" class="danger" style="width:100%;padding:14px;font-size:13px;letter-spacing:.1em;">
+      🚨 STOP ALL ALERTS
+    </button>
+  </div>
+
+  <!-- ── Social Scroller ── -->
+  <div class="panel full">
+    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Social Scroller <span id="social-scroller-status" style="font-family:'Crimson Pro',serif;font-size:11px;font-style:italic;color:var(--dark-muted);">— Active</span></span>
+      <div style="display:flex;gap:6px;">
+        <button onclick="toggleSocialScroller(true)"  id="social-on-btn"  style="padding:4px 10px;font-size:10px;">Show</button>
+        <button onclick="toggleSocialScroller(false)" id="social-off-btn" style="padding:4px 10px;font-size:10px;" class="danger">Hide</button>
+        <button onclick="saveSocialConfig()" style="padding:4px 14px;font-size:10px;">💾 Save</button>
+      </div>
+    </div>
+    <div id="social-entries" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <button onclick="addCustomSocial()" style="margin-top:8px;width:100%;padding:6px;font-size:10px;letter-spacing:.1em;">+ Add Custom Message</button>
+  </div>
+
+  <!-- ── Theme Switcher ── -->
+  <div class="panel full">
+    <div class="panel-title">Theme</div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <select id="theme-select" onchange="switchTheme(this.value)" style="flex:1;padding:8px 12px;font-family:'Cinzel',serif;font-size:11px;letter-spacing:.1em;">
+        <option value="tavern">🍺 Neighborhood Tavern (Default)</option>
+        <option value="disney">✨ Disney Music Magic</option>
+      </select>
+      <span id="theme-status" style="font-family:'Crimson Pro',serif;font-size:13px;font-style:italic;color:var(--dark-muted);">—</span>
+    </div>
+  </div>
+
+  <!-- ── Hype Train Test ── -->
+  <div class="panel full">
+    <div class="panel-title">Hype Train Test</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="fireHypeTrainTest(1)" style="flex:1;padding:10px;">Level 1</button>
+      <button onclick="fireHypeTrainTest(2)" style="flex:1;padding:10px;">Level 2</button>
+      <button onclick="fireHypeTrainTest(3)" style="flex:1;padding:10px;">Level 3</button>
+      <button onclick="fireHypeTrainTest(4)" style="flex:1;padding:10px;">Level 4</button>
+      <button onclick="fireHypeTrainTest(5)" style="flex:1;padding:10px;">Level 5</button>
+      <button onclick="fireHypeTrainTest(1,'ended')" class="danger" style="flex:1;padding:10px;">End Train</button>
+    </div>
+  </div>
+
+  <!-- ── Fire Test Alerts ── -->
+  <div class="panel">
+    <div class="panel-title">Fire Test Alert — Twitch</div>
+    <div class="btn-grid">
+      <button onclick="test('follow')"><span class="icon">♩</span> Follow</button>
+      <button onclick="testWithGoal('follow')"><span class="icon">♩</span> Follow + Goal</button>
+      <button onclick="test('sub')"><span class="icon">★</span> Sub</button>
+      <button onclick="testWithGoal('sub')"><span class="icon">★</span> Sub + Goal</button>
+      <button onclick="test('resub')"><span class="icon">♻</span> Resub</button>
+      <button onclick="test('giftsub')"><span class="icon">♦</span> Gift Sub</button>
+      <button onclick="test('bits')"><span class="icon">◆</span> Bits</button>
+      <button onclick="test('raid')"><span class="icon">⚔</span> Raid</button>
+      <button onclick="test('tip')"><span class="icon">✦</span> Tip</button>
+      <button onclick="testShoutout()"><span class="icon">📣</span> Shoutout</button>
+    </div>
+    <div id="queue-display"></div>
+  </div>
+
+  <!-- ── YouTube Test Alerts ── -->
+  <div class="panel">
+    <div class="panel-title">Fire Test Alert — YouTube</div>
+    <div class="btn-grid">
+      <button onclick="test('yt_subscriber')"><span class="icon">▶</span> Subscriber</button>
+      <button onclick="test('yt_superchat')"><span class="icon">💬</span> Super Chat</button>
+      <button onclick="test('yt_supersticker')"><span class="icon">🌟</span> Super Sticker</button>
+      <button onclick="test('yt_member')"><span class="icon">🏅</span> New Member</button>
+      <button onclick="test('yt_milestone')"><span class="icon">🎖</span> Milestone</button>
+      <button onclick="test('yt_giftmember')"><span class="icon">🎁</span> Gift Member</button>
+    </div>
+  </div>
+
+  <!-- ── Custom Alert ── -->
+  <div class="panel">
+    <div class="panel-title">Custom Alert</div>
+    <div class="field">
+      <label>Type</label>
+      <select id="custom-type">
+        <option value="follow">Follow</option>
+        <option value="sub">Sub</option>
+        <option value="resub">Resub</option>
+        <option value="giftsub">Gift Sub</option>
+        <option value="bits">Bits</option>
+        <option value="raid">Raid</option>
+        <option value="tip">Tip</option>
+        <option value="shoutout">Shoutout</option>
+        <option value="yt_subscriber">▶ YT Subscriber</option>
+        <option value="yt_superchat">💬 YT Super Chat</option>
+        <option value="yt_supersticker">🌟 YT Super Sticker</option>
+        <option value="yt_member">🏅 YT New Member</option>
+        <option value="yt_milestone">🎖 YT Milestone</option>
+        <option value="yt_giftmember">🎁 YT Gift Member</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Username</label>
+      <input id="custom-user" type="text" value="TestUser" />
+    </div>
+    <div class="field">
+      <label>Amount / Months / Viewers</label>
+      <input id="custom-amount" type="text" placeholder="optional" />
+    </div>
+    <div class="field">
+      <label>Message</label>
+      <input id="custom-msg" type="text" placeholder="optional" />
+    </div>
+    <div class="btn-grid single">
+      <button onclick="fireCustom()"><span class="icon">▶</span> Fire Alert</button>
+    </div>
+  </div>
+
+  <!-- ── Shoutout ── -->
+  <div class="panel">
+    <div class="panel-title">Manual Shoutout</div>
+    <div class="field">
+      <label>Twitch Username</label>
+      <input id="so-user" type="text" placeholder="username" />
+    </div>
+    <div class="field">
+      <label>Override Game (optional)</label>
+      <input id="so-game" type="text" placeholder="auto-fetched if blank" />
+    </div>
+    <div class="btn-grid single">
+      <button onclick="manualShoutout()"><span class="icon">📣</span> Send Shoutout</button>
+    </div>
+  </div>
+
+  <!-- ── Status ── -->
+  <div class="panel">
+    <div class="panel-title">System Status</div>
+    <div class="token-row">
+      <span class="dot" id="token-dot">⚪</span>
+      <span id="token-status">Checking token broker…</span>
+    </div>
+    <div class="token-row">
+      <span class="dot" id="overlay-dot">⚪</span>
+      <span id="overlay-status">Overlay: <a href="http://192.168.6.228:3010/nom-alerts.html" target="_blank" style="color:var(--amber)">192.168.6.228:3010/nom-alerts.html</a></span>
+    </div>
+    <hr>
+    <div class="btn-grid">
+      <button onclick="checkStatus()"><span class="icon">↺</span> Refresh Status</button>
+      <button onclick="window.open('http://192.168.6.228:3010/status','_blank')"><span class="icon">⊙</span> Raw Status</button>
+    </div>
+  </div>
+
+  <!-- ── Goal Manager ── -->
+  <div class="panel full">
+    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Stream Goal</span>
+      <div style="display:flex;gap:6px;">
+        <button onclick="toggleGoalVisibility(true)"  id="goal-vis-on"  style="padding:4px 10px;font-size:10px;">Show</button>
+        <button onclick="toggleGoalVisibility(false)" id="goal-vis-off" style="padding:4px 10px;font-size:10px;" class="danger">Hide</button>
+        <button onclick="resetGoal()" class="danger" style="padding:4px 12px;font-size:9px;">↺ Reset</button>
+      </div>
+    </div>
+
+    <!-- Current state display -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+      <div class="token-row" style="flex-direction:column;align-items:flex-start;gap:2px;">
+        <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--dark-muted);">TOTAL</span>
+        <span id="goal-total-display" style="font-size:18px;color:var(--warm);font-family:'Cinzel',serif;">$0.00</span>
+      </div>
+      <div class="token-row" style="flex-direction:column;align-items:flex-start;gap:2px;">
+        <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--dark-muted);display:none;">♦ BITS</span>
+        <span id="goal-bits-display" style="font-size:18px;color:#FFD050;font-family:'Cinzel',serif;display:none;">$0.00</span>
+      </div>
+      <div class="token-row" style="flex-direction:column;align-items:flex-start;gap:2px;">
+        <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--dark-muted);">★ SUBS</span>
+        <span id="goal-subs-display" style="font-size:18px;color:#D4A840;font-family:'Cinzel',serif;">$0.00</span>
+      </div>
+      <div class="token-row" style="flex-direction:column;align-items:flex-start;gap:2px;">
+        <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--dark-muted);">✦ TIPS</span>
+        <span id="goal-tips-display" style="font-size:18px;color:#F0C060;font-family:'Cinzel',serif;">$0.00</span>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Manual add -->
+    <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--amber);margin-bottom:12px;">Manual Add Revenue</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">
+      <div class="field" style="margin:0;">
+        <label>Type</label>
+        <select id="goal-type" onchange="onGoalTypeChange()">
+          <option value="bits">♦ Bits</option>
+          <option value="sub">★ Sub</option>
+          <option value="prime">👑 Prime Sub</option>
+          <option value="resub">♻ Resub</option>
+          <option value="giftsub">♦ Gift Sub</option>
+          <option value="tip">✦ Tip</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0;" id="goal-tier-wrap">
+        <label>Tier</label>
+        <select id="goal-tier">
+          <option value="1">Tier 1 — $3.00</option>
+          <option value="2">Tier 2 — $5.00</option>
+          <option value="3">Tier 3 — $12.50</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0;" id="goal-amount-wrap">
+        <label id="goal-amount-label">Amount</label>
+        <input id="goal-amount" type="number" min="0" step="0.01" placeholder="e.g. 100" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label>Note (optional)</label>
+        <input id="goal-note" type="text" placeholder="e.g. missed sub" />
+      </div>
+      <button onclick="manualAddGoal()" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">+</span> Add
+      </button>
+    </div>
+
+    <hr>
+
+    <!-- Manual remove -->
+    <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--amber);margin-bottom:12px;">Manual Remove Revenue</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end;">
+      <div class="field" style="margin:0;">
+        <label>Type</label>
+        <select id="remove-type" onchange="onRemoveTypeChange()">
+          <option value="bits">♦ Bits</option>
+          <option value="sub">★ Sub</option>
+          <option value="prime">👑 Prime Sub</option>
+          <option value="resub">♻ Resub</option>
+          <option value="giftsub">♦ Gift Sub</option>
+          <option value="tip">✦ Tip</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0;" id="remove-tier-wrap">
+        <label>Tier</label>
+        <select id="remove-tier">
+          <option value="1">Tier 1 — $3.00</option>
+          <option value="2">Tier 2 — $5.00</option>
+          <option value="3">Tier 3 — $12.50</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0;" id="remove-amount-wrap">
+        <label id="remove-amount-label">Amount</label>
+        <input id="remove-amount" type="number" min="0" step="0.01" placeholder="e.g. 100" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label>Note (optional)</label>
+        <input id="remove-note" type="text" placeholder="e.g. test fire" />
+      </div>
+      <button onclick="manualRemoveGoal()" class="danger" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">−</span> Remove
+      </button>
+    </div>
+
+    <hr>
+
+    <!-- Goal settings -->
+    <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--amber);margin-bottom:12px;">Goal Settings</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;">
+      <div class="field" style="margin:0;">
+        <label>Goal Title</label>
+        <input id="goal-title-input" type="text" placeholder="Stream Goal" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label>Target Amount ($)</label>
+        <input id="goal-target-input" type="number" min="1" step="1" placeholder="500" />
+      </div>
+      <button onclick="updateGoalSettings()" style="height:38px;padding:0 16px;">
+        <span class="icon">✓</span> Update
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Health Tracker ── -->
+  <div class="panel">
+    <div class="panel-title">Health Tracker</div>
+
+    <div class="token-row" style="justify-content:space-between;">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <span>👟 Step Tracker</span>
+        <span id="steps-status" style="font-size:11px;font-style:italic;color:var(--dark-muted);">—</span>
+      </span>
+      <div style="display:flex;gap:6px;">
+        <button onclick="toggleHealth('steps', true)"  id="steps-on"  style="padding:4px 10px;font-size:10px;">On</button>
+        <button onclick="toggleHealth('steps', false)" id="steps-off" style="padding:4px 10px;font-size:10px;" class="danger">Off</button>
+      </div>
+    </div>
+
+    <div class="token-row" style="justify-content:space-between;margin-top:6px;">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <span>💧 Water Tracker</span>
+        <span id="water-status" style="font-size:11px;font-style:italic;color:var(--dark-muted);">—</span>
+      </span>
+      <div style="display:flex;gap:6px;">
+        <button onclick="toggleHealth('water', true)"  id="water-on"  style="padding:4px 10px;font-size:10px;">On</button>
+        <button onclick="toggleHealth('water', false)" id="water-off" style="padding:4px 10px;font-size:10px;" class="danger">Off</button>
+      </div>
+    </div>
+
+    <hr>
+    <div style="font-family:'Crimson Pro',serif;font-size:12px;font-style:italic;color:var(--dark-muted);">
+      Polling <a href="http://192.168.7.108:8082/get-activity-data" target="_blank" style="color:var(--amber)">192.168.7.108:8082</a> every 60s
+    </div>
+  </div>
+
+  <!-- ── Event Log ── -->
+  <div class="panel full">
+    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Event Log</span>
+      <button onclick="clearLog()" style="padding:4px 10px;font-size:9px;border-color:#B8782033;">Clear</button>
+    </div>
+    <div id="log"></div>
+  </div>
+
+</main>
+
+<script>
+// ─── Shared overlay URL ─────────────────────────────────────────────────────
+const OVERLAY_URL = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
+  ? CONFIG.tokenBrokerUrl.replace('/token', '')
+  : 'http://192.168.6.228:3010';
+
+// ─── Log ───────────────────────────────────────────────────────────────────
+function addLog(msg, type = '') {
+  const log  = document.getElementById('log');
+  const time = new Date().toLocaleTimeString();
+  const div  = document.createElement('div');
+  div.className = `entry ${type}`;
+  div.textContent = `[${time}] ${msg}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+function clearLog() { document.getElementById('log').innerHTML = ''; }
+
+// ─── Streamer.bot WebSocket ────────────────────────────────────────────────
+const SB_URL = (typeof CONFIG !== 'undefined' && CONFIG.streamerbotUrl)
+  ? CONFIG.streamerbotUrl
+  : 'ws://127.0.0.1:8080';
+
+const SB_SUB = {
+  request: 'Subscribe',
+  id:      'nom-admin',
+  events: {
+    Twitch:     ['Follow','Cheer','Sub','ReSub','GiftSub','GiftBomb','Raid','ChatMessage'],
+    Fourthwall: ['Donation'],
+  },
+};
+
+let ws = null;
+let reconnectMs = 2000;
+
+function sbConnect() {
+  ws = new WebSocket(SB_URL);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify(SB_SUB));
+    setStatus('connected');
+    reconnectMs = 2000;
+    addLog(`Connected to Streamer.bot at ${SB_URL}`, 'ok');
+  };
+
+  ws.onmessage = ({ data }) => {
+    let msg;
+    try { msg = JSON.parse(data); } catch { return; }
+    const src  = msg?.event?.source;
+    const type = msg?.event?.type;
+    if (msg.status === 'ok' && msg.id?.startsWith('nom-')) return;
+    if (!src || !type) return;
+    addLog(`${src} → ${type}`, 'event');
+  };
+
+  ws.onerror = () => {};
+  ws.onclose = (ev) => {
+    setStatus('disconnected');
+    addLog(`Disconnected (code:${ev.code}) — retrying in ${reconnectMs}ms`, 'warn');
+    setTimeout(sbConnect, reconnectMs);
+    reconnectMs = Math.min(reconnectMs * 1.5, 30000);
+  };
+}
+
+function setStatus(state) {
+  const dot = document.getElementById('sb-dot');
+  const txt = document.getElementById('sb-status');
+  if (state === 'connected')    { dot.textContent = '🟢'; txt.textContent = `Streamer.bot — ${SB_URL}`; }
+  if (state === 'disconnected') { dot.textContent = '🔴'; txt.textContent = 'Disconnected — retrying…'; }
+  if (state === 'connecting')   { dot.textContent = '🟡'; txt.textContent = 'Connecting…'; }
+}
+
+// ─── Token status ──────────────────────────────────────────────────────────
+async function checkStatus() {
+  const dot = document.getElementById('token-dot');
+  const txt = document.getElementById('token-status');
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/status`);
+    const data = await res.json();
+    if (data.authorized) {
+      const exp = new Date(data.expiresAt).toLocaleString();
+      dot.textContent = '🟢';
+      txt.textContent = `Token valid — expires ${exp}`;
+      addLog(`Token OK — expires ${exp}`, 'ok');
+    } else {
+      dot.textContent = '🔴';
+      txt.textContent = 'Token not authorized — visit /auth';
+      addLog('Token not authorized', 'error');
+    }
+  } catch (e) {
+    dot.textContent = '🔴';
+    txt.textContent = 'Could not reach token broker';
+    addLog(`Token broker unreachable: ${e.message}`, 'error');
+  }
+}
+
+// ─── Test helpers ──────────────────────────────────────────────────────────
+const TEST_DATA = {
+  follow:   ['TestFollower',  null,    null],
+  sub:      ['SubGoblin',     1,       null],
+  resub:    ['LoyalBard',     14,      'Been here since the very first stream!'],
+  giftsub:  ['GiftKing',      5,       null],
+  bits:     ['BitMaster',     1000,    'Keep the music going!'],
+  raid:     ['RaidLeader',    47,      null],
+  tip:      ['TipHero',       10.00,   'Love the vibe in here!'],
+  shoutout:      ['neighborhoodofmusic', null,  null],
+  yt_subscriber: ['YTViewer',           null,  null],
+  yt_superchat:  ['YTSupporter',        10.00, 'Love the stream!'],
+  yt_supersticker: ['YTFan',            5.00,  null],
+  yt_member:     ['YTMember',           null,  null],
+  yt_milestone:  ['YTLoyalist',         6,     null],
+  yt_giftmember: ['YTGifter',           3,     null],
+};
+
+function testWithGoal(type) {
+  const [u, a, m] = TEST_DATA[type];
+  const fakeGoal = type === 'follow'
+    ? { type: 'follower', description: 'Follower Goal', current: 847, target: 1000 }
+    : { type: 'subscriber', description: 'Subscriber Goal', current: 23, target: 50 };
+  sendAlertToOverlay(type, u, a, m, fakeGoal);
+  addLog(`Test fired: ${type} + goal — ${u}`, 'ok');
+}
+
+function test(type) {
+  const [u, a, m] = TEST_DATA[type];
+  sendAlertToOverlay(type, u, a, m);
+  addLog(`Test fired: ${type} — ${u}`, 'ok');
+}
+
+function testShoutout() {
+  sendShoutoutToOverlay('neighborhoodofmusic', null, null);
+  addLog('Test shoutout fired: neighborhoodofmusic', 'ok');
+}
+
+function fireCustom() {
+  const type   = document.getElementById('custom-type').value;
+  const user   = document.getElementById('custom-user').value || 'TestUser';
+  const amount = document.getElementById('custom-amount').value || null;
+  const msg    = document.getElementById('custom-msg').value || null;
+  if (type === 'shoutout') {
+    sendShoutoutToOverlay(user, null, amount || null);
+  } else {
+    sendAlertToOverlay(type, user, amount, msg);
+  }
+  addLog(`Custom alert fired: ${type} — ${user}`, 'ok');
+}
+
+function manualShoutout() {
+  const user = document.getElementById('so-user').value.trim().replace(/^@/, '');
+  const game = document.getElementById('so-game').value.trim() || null;
+  if (!user) { addLog('Shoutout: no username entered', 'warn'); return; }
+  sendShoutoutToOverlay(user, null, game);
+  addLog(`Shoutout fired: ${user}${game ? ` | ${game}` : ''}`, 'ok');
+}
+
+// ─── Send to overlay via server HTTP endpoint ──────────────────────────────
+// POST to /fire-alert — server.js relays it to the overlay's internal queue
+async function sendAlertToOverlay(type, username, amount, message, goal = null) {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/fire-alert`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ type, username, amount, message, goal }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      addLog(`Alert fired: ${type} — ${username}`, 'ok');
+    } else {
+      addLog(`Fire failed: ${res.status}`, 'error');
+    }
+  } catch (e) {
+    addLog(`Fire error: ${e.message}`, 'error');
+  }
+}
+
+async function sendShoutoutToOverlay(username, profileUrl, game) {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/fire-alert`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ type: 'shoutout', username, profileUrl: profileUrl ?? null, game: game ?? null }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      addLog(`Shoutout fired: ${username}`, 'ok');
+    } else {
+      addLog(`Shoutout failed: ${res.status}`, 'error');
+    }
+  } catch (e) {
+    addLog(`Shoutout error: ${e.message}`, 'error');
+  }
+}
+
+// ─── Queue display (fetched from overlay via HTTP) ─────────────────────────
+function updateQueueDisplay() {
+  // Overlay exposes no HTTP queue endpoint yet — placeholder
+  document.getElementById('queue-display').textContent = '';
+}
+
+// ─── Panic Button ─────────────────────────────────────────────────────────────
+let panicState = false;
+
+async function togglePanic() {
+  panicState = !panicState;
+  try {
+    await fetch(`${OVERLAY_URL}/alerts-pause-toggle`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ paused: panicState }),
+    });
+    updatePanicButton();
+    addLog(panicState ? '🚨 ALL ALERTS PAUSED' : 'Alerts resumed', panicState ? 'error' : 'ok');
+  } catch (e) {
+    panicState = !panicState; // revert on failure
+    addLog(`Panic toggle error: ${e.message}`, 'error');
+  }
+}
+
+function updatePanicButton() {
+  const btn    = document.getElementById('panic-btn');
+  const status = document.getElementById('panic-status');
+  if (panicState) {
+    btn.textContent = '✅ RESUME ALERTS';
+    status.textContent = '🚨 Alerts: PAUSED';
+    status.style.color = '#E03020';
+  } else {
+    btn.textContent = '🚨 STOP ALL ALERTS';
+    status.textContent = 'Alerts: Active';
+    status.style.color = 'var(--dark-muted)';
+  }
+}
+
+async function fetchPanicState() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/alerts-paused-state`);
+    const data = await res.json();
+    panicState = !!data.paused;
+    updatePanicButton();
+  } catch(e) {}
+}
+
+// ─── Social Scroller ───────────────────────────────────────────────────────────
+let socialEntries = [];
+
+const PLATFORM_ICONS = {
+  Twitch: '🟣', TikTok: '🎵', Twitter: '🐦',
+  YouTube: '▶️', Bluesky: '🦋', Discord: '💬', Custom: '✏️',
+};
+
+const DEFAULT_SOCIAL_ENTRIES = [
+  { enabled: true,  icon: 'https://cdn.simpleicons.org/twitch', handle: '/neighborhoodofmusic', label: 'Twitch'  },
+  { enabled: true,  icon: 'https://cdn.simpleicons.org/tiktok', handle: '@musicman0917', label: 'TikTok'  },
+  { enabled: true,  icon: 'https://cdn.simpleicons.org/twitter', handle: '@NomusicNom', label: 'Twitter' },
+  { enabled: true,  icon: 'https://cdn.simpleicons.org/youtube', handle: 'NeighborhoodofMusic', label: 'YouTube' },
+  { enabled: true,  icon: 'https://cdn.simpleicons.org/bluesky', handle: '@neighborhoodofmusic', label: 'Bluesky' },
+  { enabled: true,  icon: 'https://cdn.simpleicons.org/discord', handle: 'discord.gg/nom', label: 'Discord' },
+];
+
+async function toggleSocialScroller(enabled) {
+  try {
+    await fetch(`${OVERLAY_URL}/social-scroller-toggle`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ enabled }),
+    });
+    updateSocialScrollerButtons(enabled);
+    addLog(`Social scroller ${enabled ? 'shown' : 'hidden'}`, 'ok');
+  } catch(e) {
+    addLog(`Social scroller toggle error: ${e.message}`, 'error');
+  }
+}
+
+function updateSocialScrollerButtons(enabled) {
+  document.getElementById('social-on-btn').style.borderColor  = enabled  ? 'var(--amber)' : '';
+  document.getElementById('social-off-btn').style.borderColor = !enabled ? '#E03020'      : '';
+  document.getElementById('social-scroller-status').textContent = enabled ? '— Active' : '— Hidden';
+  document.getElementById('social-scroller-status').style.color = enabled ? 'var(--dark-muted)' : '#E03020';
+}
+
+async function fetchSocialConfig() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/social-config`);
+    const data = await res.json();
+    socialEntries = (Array.isArray(data) && data.length) ? data : [...DEFAULT_SOCIAL_ENTRIES];
+    renderSocialEntries();
+  } catch(e) {
+    socialEntries = [...DEFAULT_SOCIAL_ENTRIES];
+    renderSocialEntries();
+    addLog('Social config fetch failed — showing defaults', 'error');
+  }
+}
+
+function renderSocialEntries() {
+  const container = document.getElementById('social-entries');
+  container.innerHTML = '';
+  if (!socialEntries.length) {
+    container.innerHTML = '<div style="font-family:Crimson Pro,serif;font-style:italic;color:var(--dark-muted);font-size:13px;">No entries — loading failed. Try refreshing.</div>';
+    return;
+  }
+  socialEntries.forEach((entry, i) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    row.innerHTML = `
+      <input type="checkbox" ${entry.enabled ? 'checked' : ''} onchange="socialEntries[${i}].enabled=this.checked" style="width:16px;height:16px;cursor:pointer;">
+      <input type="text" value="${entry.icon || ''}" placeholder="emoji/URL"
+        oninput="socialEntries[${i}].icon=this.value; renderSocialEntries();"
+        style="width:90px;padding:4px 6px;font-size:11px;">
+      <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        ${entry.icon && entry.icon.startsWith('http')
+          ? `<img src="${entry.icon}" style="width:24px;height:24px;object-fit:contain;border-radius:4px;" onerror="this.style.display='none'">`
+          : entry.icon
+            ? `<span style="font-size:20px;">${entry.icon}</span>`
+            : `<span style="font-size:9px;color:var(--dark-muted);font-style:italic;">none</span>`}
+      </div>
+      <input type="text" value="${entry.label}" oninput="socialEntries[${i}].label=this.value"
+        style="width:80px;padding:4px 6px;font-size:11px;font-family:'Cinzel',serif;color:var(--amber);">
+      <input type="text" value="${entry.handle}" oninput="socialEntries[${i}].handle=this.value"
+        style="flex:1;padding:4px 8px;font-size:12px;font-family:'Crimson Pro',serif;">
+      <button onclick="removeSocialEntry(${i})" style="padding:2px 8px;font-size:10px;" class="danger">✕</button>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function addCustomSocial() {
+  socialEntries.push({ enabled: true, icon: '', handle: 'Your message here', label: 'Custom' });
+  renderSocialEntries();
+}
+
+function removeSocialEntry(i) {
+  socialEntries.splice(i, 1);
+  renderSocialEntries();
+}
+
+async function saveSocialConfig() {
+  try {
+    await fetch(`${OVERLAY_URL}/social-config`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(socialEntries),
+    });
+    addLog('Social config saved ✓', 'ok');
+  } catch(e) { addLog(`Social save error: ${e.message}`, 'error'); }
+}
+
+// ─── Theme Switcher ───────────────────────────────────────────────────────────
+async function switchTheme(theme) {
+  try {
+    await fetch(`${OVERLAY_URL}/theme-set`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ theme }),
+    });
+    document.getElementById('theme-status').textContent = theme === 'disney' ? '✨ Disney Magic active' : '🍺 Tavern active';
+    addLog(`Theme switched to: ${theme}`, 'ok');
+  } catch (e) {
+    addLog(`Theme switch error: ${e.message}`, 'error');
+  }
+}
+
+async function fetchThemeState() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/theme-state`);
+    const data = await res.json();
+    document.getElementById('theme-select').value = data.theme || 'tavern';
+    document.getElementById('theme-status').textContent =
+      data.theme === 'disney' ? '✨ Disney Magic active' : '🍺 Tavern active';
+  } catch (e) {}
+}
+
+// ─── Hype Train Test ──────────────────────────────────────────────────────────
+async function fireHypeTrainTest(level, status) {
+  try {
+    await fetch(`${OVERLAY_URL}/hype-train-test`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ level, status: status || 'active' }),
+    });
+    addLog(`Hype Train test fired — Level ${level}${status === 'ended' ? ' (ended)' : ''}`, 'ok');
+  } catch (e) {
+    addLog(`Hype Train test error: ${e.message}`, 'error');
+  }
+}
+
+// ─── Goal Manager ─────────────────────────────────────────────────────────────
+function updateGoalVisButtons() {
+  fetch(`${OVERLAY_URL}/goal-state`).then(r => r.json()).then(data => {
+    const vis = data.visible !== false;
+    document.getElementById('goal-vis-on').style.borderColor  = vis ? 'var(--amber)' : '';
+    document.getElementById('goal-vis-off').style.borderColor = !vis ? '#E03020' : '';
+  }).catch(() => {});
+}
+
+async function fetchGoalState() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/goal-state`);
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('goal-bits-display').textContent  = `$${(data.bits  ||0).toFixed(2)}`;
+    document.getElementById('goal-subs-display').textContent  = `$${(data.subs  ||0).toFixed(2)}`;
+    document.getElementById('goal-tips-display').textContent  = `$${(data.tips  ||0).toFixed(2)}`;
+    const total = (data.bits||0) + (data.subs||0) + (data.tips||0);
+    document.getElementById('goal-total-display').textContent = `$${total.toFixed(2)}`;
+    if (data.title)  document.getElementById('goal-title-input').placeholder  = data.title;
+    if (data.amount) document.getElementById('goal-target-input').placeholder = data.amount;
+  } catch (e) {
+    addLog(`Goal state fetch failed: ${e.message}`, 'warn');
+  }
+}
+
+// Streamer payout after Twitch 50/50 split
+const SUB_PRICES = { 1: 3.00, 2: 5.00, 3: 12.50 };
+const SUB_TYPES  = ['sub', 'prime', 'resub', 'giftsub'];
+
+function onGoalTypeChange() {
+  const type      = document.getElementById('goal-type').value;
+  const isSub     = SUB_TYPES.includes(type);
+  const tierWrap  = document.getElementById('goal-tier-wrap');
+  const amtWrap   = document.getElementById('goal-amount-wrap');
+  const amtLabel  = document.getElementById('goal-amount-label');
+  const amtInput  = document.getElementById('goal-amount');
+
+  tierWrap.style.display = isSub ? 'block' : 'none';
+
+  if (type === 'bits') {
+    amtLabel.textContent      = 'Bits';
+    amtInput.placeholder      = 'e.g. 100';
+    amtInput.step             = '1';
+    amtWrap.style.display     = 'block';
+  } else if (type === 'tip') {
+    amtLabel.textContent      = 'Amount ($)';
+    amtInput.placeholder      = 'e.g. 5.00';
+    amtInput.step             = '0.01';
+    amtWrap.style.display     = 'block';
+  } else if (type === 'prime') {
+    // Prime pays same as Tier 1, no extra fields needed
+    amtWrap.style.display = 'none';
+  } else if (type === 'giftsub') {
+    amtLabel.textContent      = 'Count';
+    amtInput.placeholder      = 'e.g. 5';
+    amtInput.step             = '1';
+    amtWrap.style.display     = 'block';
+  } else {
+    // sub / resub — no separate amount needed, tier covers it
+    amtWrap.style.display     = 'none';
+  }
+}
+
+async function manualAddGoal() {
+  const type  = document.getElementById('goal-type').value;
+  const tier  = parseInt(document.getElementById('goal-tier').value) || 1;
+  const note  = document.getElementById('goal-note').value || '';
+  const isSub = SUB_TYPES.includes(type);
+
+  let amount;
+  if (type === 'sub' || type === 'resub' || type === 'prime') {
+    amount = type === 'prime' ? 3.00 : (SUB_PRICES[tier] || 3.00);
+  } else if (type === 'giftsub') {
+    const count = parseInt(document.getElementById('goal-amount').value) || 1;
+    amount = count; // server handles the per-tier math
+  } else {
+    amount = parseFloat(document.getElementById('goal-amount').value);
+    if (!amount || isNaN(amount)) { addLog('Manual add: enter a valid amount', 'warn'); return; }
+  }
+
+  const label = type === 'prime'
+    ? 'Prime Sub ($3.00)'
+    : (type === 'sub' || type === 'resub')
+      ? `Tier ${tier} ($${(SUB_PRICES[tier]||4.99).toFixed(2)})`
+      : `${amount} ${type}`;
+
+  try {
+    const res = await fetch(`${OVERLAY_URL}/goal-add`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ type, amount, tier, note }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      addLog(`Goal updated: ${label}${note ? ` (${note})` : ''}`, 'ok');
+      document.getElementById('goal-amount').value = '';
+      document.getElementById('goal-note').value   = '';
+      fetchGoalState();
+    } else {
+      addLog(`Goal add failed: ${JSON.stringify(data)}`, 'error');
+    }
+  } catch (e) {
+    addLog(`Goal add error: ${e.message}`, 'error');
+  }
+}
+
+function onRemoveTypeChange() {
+  const type     = document.getElementById('remove-type').value;
+  const isSub    = ['sub', 'prime', 'resub', 'giftsub'].includes(type);
+  const tierWrap = document.getElementById('remove-tier-wrap');
+  const amtWrap  = document.getElementById('remove-amount-wrap');
+  const amtLabel = document.getElementById('remove-amount-label');
+  const amtInput = document.getElementById('remove-amount');
+
+  tierWrap.style.display = (isSub && type !== 'prime') ? 'block' : 'none';
+
+  if (type === 'bits') {
+    amtLabel.textContent = 'Bits'; amtInput.placeholder = 'e.g. 100'; amtInput.step = '1';
+    amtWrap.style.display = 'block';
+  } else if (type === 'tip') {
+    amtLabel.textContent = 'Amount ($)'; amtInput.placeholder = 'e.g. 5.00'; amtInput.step = '0.01';
+    amtWrap.style.display = 'block';
+  } else if (type === 'giftsub') {
+    amtLabel.textContent = 'Count'; amtInput.placeholder = 'e.g. 5'; amtInput.step = '1';
+    amtWrap.style.display = 'block';
+  } else {
+    amtWrap.style.display = 'none';
+  }
+}
+
+async function manualRemoveGoal() {
+  const type  = document.getElementById('remove-type').value;
+  const tier  = parseInt(document.getElementById('remove-tier').value) || 1;
+  const note  = document.getElementById('remove-note').value || '';
+  const isSub = ['sub', 'prime', 'resub', 'giftsub'].includes(type);
+
+  let amount;
+  if (type === 'sub' || type === 'resub') {
+    amount = SUB_PRICES[tier] || 3.00;
+  } else if (type === 'prime') {
+    amount = 3.00;
+  } else if (type === 'giftsub') {
+    const count = parseInt(document.getElementById('remove-amount').value) || 1;
+    amount = count;
+  } else {
+    amount = parseFloat(document.getElementById('remove-amount').value);
+    if (!amount || isNaN(amount)) { addLog('Manual remove: enter a valid amount', 'warn'); return; }
+  }
+
+  const label = type === 'prime'
+    ? 'Prime Sub ($3.00)'
+    : (type === 'sub' || type === 'resub')
+      ? `Tier ${tier} ($${(SUB_PRICES[tier]||3.00).toFixed(2)})`
+      : `${amount} ${type}`;
+
+  try {
+    const res = await fetch(`${OVERLAY_URL}/goal-remove`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ type, amount, tier, note }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      addLog(`Goal removed: ${label}${note ? ` (${note})` : ''}`, 'ok');
+      document.getElementById('remove-amount').value = '';
+      document.getElementById('remove-note').value   = '';
+      fetchGoalState();
+    } else {
+      addLog(`Goal remove failed: ${JSON.stringify(data)}`, 'error');
+    }
+  } catch (e) {
+    addLog(`Goal remove error: ${e.message}`, 'error');
+  }
+}
+
+async function toggleGoalVisibility(visible) {
+  try {
+    await fetch(`${OVERLAY_URL}/goal-toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visible }),
+    });
+    document.getElementById('goal-vis-on').style.borderColor  = visible ? 'var(--amber)' : '';
+    document.getElementById('goal-vis-off').style.borderColor = !visible ? '#E03020' : '';
+    addLog(`Stream goal ${visible ? 'shown' : 'hidden'}`, 'ok');
+  } catch (e) {
+    addLog(`Goal toggle error: ${e.message}`, 'error');
+  }
+}
+
+async function resetGoal() {
+  if (!confirm('Reset the stream goal? This cannot be undone.')) return;
+  try {
+    const res = await fetch(`${OVERLAY_URL}/goal-reset`, { method: 'POST' });
+    if (res.ok) {
+      addLog('Goal reset', 'ok');
+      fetchGoalState();
+    }
+  } catch (e) {
+    addLog(`Goal reset error: ${e.message}`, 'error');
+  }
+}
+
+async function updateGoalSettings() {
+  const title  = document.getElementById('goal-title-input').value.trim();
+  const amount = parseFloat(document.getElementById('goal-target-input').value);
+  if (!title && !amount) { addLog('Goal settings: enter a title or amount', 'warn'); return; }
+  try {
+    const res = await fetch(`${OVERLAY_URL}/goal-settings`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ title: title || undefined, amount: amount || undefined }),
+    });
+    if (res.ok) {
+      addLog(`Goal settings updated${title ? ` — title: "${title}"` : ''}${amount ? ` — target: $${amount}` : ''}`, 'ok');
+    }
+  } catch (e) {
+    addLog(`Goal settings error: ${e.message}`, 'error');
+  }
+}
+
+// ─── Health Tracker ───────────────────────────────────────────────────────────
+const healthState = { steps: true, water: true };
+
+async function toggleHealth(tracker, enabled) {
+  healthState[tracker] = enabled;
+  updateHealthButtons();
+  try {
+    await fetch(`${OVERLAY_URL}/health-toggle`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ tracker, enabled }),
+    });
+    addLog(`${tracker} tracker ${enabled ? 'enabled' : 'disabled'}`, 'ok');
+  } catch (e) {
+    addLog(`Health toggle error: ${e.message}`, 'error');
+  }
+}
+
+function updateHealthButtons() {
+  ['steps', 'water'].forEach(t => {
+    const on  = document.getElementById(`${t}-on`);
+    const off = document.getElementById(`${t}-off`);
+    const st  = document.getElementById(`${t}-status`);
+    if (!on || !off) return;
+    on.style.borderColor  = healthState[t] ? 'var(--amber)' : '';
+    off.style.borderColor = !healthState[t] ? '#E03020' : '';
+    if (st) st.textContent = healthState[t] ? 'On' : 'Off';
+  });
+}
+
+async function fetchHealthStatus() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/health-settings`);
+    const data = await res.json();
+    if (data.steps != null) healthState.steps = data.steps;
+    if (data.water != null) healthState.water = data.water;
+    updateHealthButtons();
+  } catch (e) {}
+}
+
+// ─── Init ──────────────────────────────────────────────────────────────────
+sbConnect();
+checkStatus();
+fetchGoalState();
+fetchHealthStatus();
+updateGoalVisButtons();
+onGoalTypeChange();
+onRemoveTypeChange();
+setInterval(checkStatus, 60000);
+setInterval(fetchGoalState, 15000);
+setTimeout(fetchThemeState, 100);
+setTimeout(fetchSocialConfig, 200);
+setTimeout(async function() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/social-scroller-state`);
+    const data = await res.json();
+    updateSocialScrollerButtons(data.enabled !== false);
+  } catch(e) {}
+}, 150);
+setTimeout(fetchPanicState, 100);
+</script>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NOM — Twitch Token Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Crimson+Pro:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #180C04;
+    color: #F2E4CC;
+    font-family: 'Crimson Pro', serif;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+  .card {
+    background: linear-gradient(155deg, #2A1508, #180C04);
+    border: 1px solid #B87820;
+    border-radius: 4px;
+    padding: 40px 48px;
+    max-width: 560px;
+    width: 100%;
+    text-align: center;
+  }
+  h1 {
+    font-family: 'Cinzel', serif;
+    font-size: 18px; letter-spacing: .2em;
+    color: #E89010; margin-bottom: 8px;
+  }
+  .sub { font-style: italic; color: #C0986A; margin-bottom: 32px; font-size: 15px; }
+
+  .step {
+    background: rgba(255,255,255,.04);
+    border: 1px solid #B8782033;
+    border-radius: 3px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    text-align: left;
+  }
+  .step-num {
+    font-family: 'Cinzel', serif;
+    font-size: 10px; letter-spacing: .15em;
+    color: #E89010; margin-bottom: 6px;
+  }
+  .step p { font-size: 15px; color: #C0986A; line-height: 1.5; }
+  .step code {
+    background: rgba(0,0,0,.4);
+    border: 1px solid #B8782044;
+    border-radius: 2px;
+    padding: 2px 6px;
+    font-size: 13px;
+    color: #F0C060;
+    word-break: break-all;
+  }
+
+  button {
+    background: linear-gradient(135deg, #3A2010, #2A1508);
+    border: 1px solid #B87820;
+    border-radius: 3px;
+    color: #F2E4CC;
+    font-family: 'Cinzel', serif;
+    font-size: 13px; letter-spacing: .12em;
+    padding: 14px 32px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 8px;
+    transition: box-shadow .2s, border-color .2s;
+  }
+  button:hover { border-color: #E89010; box-shadow: 0 0 16px rgba(232,144,16,.3); }
+
+  #token-box {
+    display: none;
+    margin-top: 24px;
+    background: rgba(0,0,0,.5);
+    border: 1px solid #E89010;
+    border-radius: 3px;
+    padding: 20px;
+    word-break: break-all;
+  }
+  #token-box .label {
+    font-family: 'Cinzel', serif;
+    font-size: 10px; letter-spacing: .15em;
+    color: #E89010; margin-bottom: 8px;
+  }
+  #token-val {
+    font-size: 13px; color: #F0C060;
+    background: rgba(0,0,0,.4);
+    border: 1px solid #B8782044;
+    border-radius: 2px;
+    padding: 8px 12px;
+    width: 100%;
+    cursor: text;
+    user-select: all;
+    text-align: left;
+  }
+  #copy-btn {
+    margin-top: 10px;
+    padding: 10px;
+    font-size: 11px;
+  }
+  .success { color: #4CAF50; font-style: italic; font-size: 13px; margin-top: 6px; }
+  .warning {
+    background: rgba(232,144,16,.08);
+    border: 1px solid #E8901044;
+    border-radius: 3px;
+    padding: 12px 16px;
+    margin-top: 16px;
+    font-size: 13px; font-style: italic;
+    color: #C0986A; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>♩ NOM TOKEN GENERATOR ♩</h1>
+  <p class="sub">One-time Twitch OAuth setup for your alerts overlay</p>
+
+  <div class="step">
+    <div class="step-num">STEP 1</div>
+    <p>Click the button below. Twitch will ask you to authorize the app — click <strong>Authorize</strong>.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-num">STEP 2</div>
+    <p>Your browser will redirect to <code>https://localhost</code> and show a cert error. <strong>That's fine.</strong> Just look at the URL bar — your token is after <code>#access_token=</code>. Copy everything between <code>#access_token=</code> and <code>&scope=</code>.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-num">STEP 3 — EASIER OPTION</div>
+    <p>After the cert error page loads, paste the full URL back into this tab's address bar and hit Enter. This page will extract the token automatically.</p>
+  </div>
+
+  <button onclick="authorize()">♩ Authorize with Twitch</button>
+
+  <div id="token-box">
+    <div class="label">YOUR ACCESS TOKEN</div>
+    <div id="token-val"></div>
+    <button id="copy-btn" onclick="copyToken()">Copy Token</button>
+    <div class="success" id="copy-confirm" style="display:none">✓ Copied to clipboard!</div>
+  </div>
+
+  <div class="warning">
+    ⚠ This token grants read-only access to follows, subs, cheers, and raids. Keep it private — it's only for your local overlay.
+  </div>
+</div>
+
+<script>
+  const CLIENT_ID    = 'ahmv5pa2kzq44jvn81i7z3k0jqmtgl';
+  const REDIRECT_URI = 'https://localhost';
+  const SCOPES = [
+    'moderator:read:followers',
+    'channel:read:subscriptions',
+    'bits:read',
+  ].join(' ');
+
+  function authorize() {
+    const url = new URL('https://id.twitch.tv/oauth2/authorize');
+    url.searchParams.set('client_id',     CLIENT_ID);
+    url.searchParams.set('redirect_uri',  REDIRECT_URI);
+    url.searchParams.set('response_type', 'token');
+    url.searchParams.set('scope',         SCOPES);
+    url.searchParams.set('force_verify',  'true');
+    window.location.href = url.toString();
+  }
+
+  // Auto-extract if redirected back here with a hash
+  function checkHash() {
+    const hash   = window.location.hash.slice(1);
+    const params = new URLSearchParams(hash);
+    const token  = params.get('access_token');
+    if (!token) return;
+
+    document.getElementById('token-box').style.display = 'block';
+    document.getElementById('token-val').textContent = token;
+
+    // Clean URL without reload
+    history.replaceState(null, '', window.location.pathname);
+  }
+
+  function copyToken() {
+    const t = document.getElementById('token-val').textContent;
+    navigator.clipboard.writeText(t).then(() => {
+      const c = document.getElementById('copy-confirm');
+      c.style.display = 'block';
+      setTimeout(() => c.style.display = 'none', 2500);
+    });
+  }
+
+  checkHash();
+</script>
+</body>
+</html>

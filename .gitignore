@@ -1,0 +1,13 @@
+node_modules/
+.env
+
+# Runtime state / secrets persisted by server.js
+.twitch-token.json
+.goal-state.json
+.health-settings.json
+.theme.json
+.social-config.json
+.social-scroller-enabled.json
+
+npm-debug.log*
+*.log

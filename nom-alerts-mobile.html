@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080, height=1920">
+<title>NOM Alerts — Mobile</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Pro:ital,wght@0,300;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  /* ─── Disney Theme ─────────────────────────────────── */
+  body[data-theme="disney"] {
+    --amber:      #FFD700;
+    --warm:       #FFF0A0;
+    --cream:      #FFF8DC;
+    --muted:      #D4AAFF;
+    --dark-muted: #9B7FCC;
+    --border:     #7B2FBE;
+    --glow-rgba:  rgba(155,89,182,.6);
+  }
+  body[data-theme="disney"] .card {
+    background: linear-gradient(155deg, #1a0a2e, #0d0620) !important;
+    border-color: #7B2FBE !important;
+    box-shadow: 0 0 30px rgba(155,89,182,.4), 0 8px 32px rgba(0,0,0,.8) !important;
+  }
+  body[data-theme="disney"] .accent {
+    background: linear-gradient(90deg, #9B59B6, #FFD700) !important;
+  }
+  /* ─── Social Scroller ───────────────────────────────── */
+  #social-scroller {
+    position: fixed;
+    top: 30px;
+    left: 420px;
+    right: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .social-entry {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    opacity: 0;
+    transform: scale(0.6);
+    padding: 20px 30px;
+    background: rgba(0,0,0,.55);
+    border-radius: 16px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 6px 24px rgba(0,0,0,.5);
+  }
+
+  .social-entry.bounce-in {
+    animation: socialBounceIn .5s cubic-bezier(.34,1.52,.64,1) forwards;
+  }
+  .social-entry.bounce-out {
+    animation: socialBounceOut .4s cubic-bezier(.55,0,1,.45) forwards;
+  }
+
+  @keyframes socialBounceIn {
+    from { opacity: 0; transform: scale(0.5) translateY(20px); }
+    to   { opacity: 1; transform: scale(1)   translateY(0);    }
+  }
+  @keyframes socialBounceOut {
+    from { opacity: 1; transform: scale(1)   translateY(0);    }
+    to   { opacity: 0; transform: scale(0.5) translateY(-20px); }
+  }
+
+  .social-icon {
+    font-size: 120px;
+    line-height: 1;
+    filter: drop-shadow(0 0 12px rgba(255,255,255,.2));
+  }
+  .social-icon img {
+    width: 52px; height: 52px;
+    object-fit: contain;
+    border-radius: 12px;
+  }
+  .social-handle {
+    font-family: 'Cinzel', serif;
+    font-size: 28px;
+    letter-spacing: .04em;
+    color: var(--cream);
+    text-align: center;
+    text-shadow: 0 2px 10px rgba(0,0,0,.95), 0 0 14px rgba(0,0,0,.7);
+    max-width: 380px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ─── Stats Widget ──────────────────────────────────── */
+  #stats-widget {
+    position: fixed;
+    top: 30px; left: 30px;
+    display: flex;
+    flex-direction: row;
+    gap: 24px;
+    align-items: flex-end;
+    pointer-events: none;
+    transition: opacity .5s;
+  }
+  #stats-widget.alert-active { opacity: 0; }
+
+  .sw-bar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 130px;
+  }
+
+  .sw-icon {
+    font-size: 48px;
+    line-height: 1;
+  }
+
+  .sw-track-v {
+    width: 100%;
+    height: 220px;
+    background: rgba(184,120,32,.15);
+    border: 1px solid rgba(184,120,32,.3);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    box-shadow: 0 2px 12px rgba(0,0,0,.5);
+  }
+
+  .sw-fill-v {
+    width: 100%;
+    height: 0%;
+    border-radius: 6px;
+    transition: height 1.2s cubic-bezier(.4,0,.2,1);
+  }
+  .sw-fill-v.goal  { background: linear-gradient(to top, #E89010, #F0C060); }
+  .sw-fill-v.steps { background: linear-gradient(to top, #8A6040, #E89010); }
+  .sw-fill-v.water { background: linear-gradient(to top, #1E4A8A, #4A9FD4); }
+
+  .sw-label {
+    font-family: 'Cinzel', serif;
+    font-size: 17px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--amber); text-align: center; text-shadow: 0 0 8px rgba(232,144,16,.6);
+  }
+  .sw-value {
+    font-family: 'Crimson Pro', serif;
+    font-size: 22px; font-style: italic;
+    color: #F2E4CC; text-align: center; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,.8);
+  }
+
+  body[data-theme="disney"] .sw-track-v {
+    border-color: rgba(123,47,190,.4);
+    background: rgba(123,47,190,.1);
+  }
+  body[data-theme="disney"] .sw-fill-v.goal  { background: linear-gradient(to top, #7B2FBE, #FFD700); }
+  body[data-theme="disney"] .sw-fill-v.steps { background: linear-gradient(to top, #4A0080, #9B59B6); }
+  body[data-theme="disney"] .sw-fill-v.water { background: linear-gradient(to top, #1A0050, #7B2FBE); }
+
+  /* ─── Channel Goal Bar ──────────────────────────────── */
+  .channel-goal-bar {
+    margin: 8px 20px 0;
+    padding-top: 8px;
+    border-top: 1px solid rgba(184,120,32,.25);
+  }
+  .channel-goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+  }
+  .channel-goal-label {
+    font-family: 'Cinzel', serif;
+    font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--amber);
+  }
+  .channel-goal-count {
+    font-family: 'Crimson Pro', serif;
+    font-size: 13px; font-style: italic;
+    color: var(--muted);
+  }
+  .channel-goal-track {
+    width: 100%; height: 7px;
+    background: rgba(184,120,32,.15);
+    border-radius: 3px; overflow: hidden;
+  }
+  .channel-goal-fill {
+    height: 100%;
+    background: linear-gradient(to right, #E89010, #F0C060);
+    border-radius: 3px;
+    transition: width .8s ease;
+  }
+  body[data-theme="disney"] .channel-goal-fill {
+    background: linear-gradient(to right, #9B59B6, #FFD700);
+  }
+
+  body[data-theme="disney"] .card.enter {
+    animation: disneyCardIn .6s cubic-bezier(.34,1.52,.64,1) forwards !important;
+  }
+  @keyframes disneyCardIn {
+    from { opacity:0; transform:translateX(-60px) scale(.9) rotate(-1deg); }
+    to   { opacity:1; transform:translateX(0)     scale(1)  rotate(0deg);  }
+  }
+
+  :root {
+    --amber:   #E89010;
+    --gold:    #D4A840;
+    --warm:    #F0C060;
+    --cream:   #F2E4CC;
+    --muted:   #C0986A;
+    --dark:    #0E0602;
+    --card-bg: #1E0E04;
+    --border:  #B87820;
+    --glow:    rgba(232,144,16,0.6);
+  }
+
+  html, body {
+    width: 1080px; height: 1920px;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  /* ─── Alert Container ── */
+  #stage {
+    position: fixed;
+    top: 120px;
+    left: 0; right: 0;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* ─── Card ── */
+  .card {
+    position: relative;
+    width: 860px;
+    background: linear-gradient(135deg, #2A1508 0%, #1A0B04 50%, #0E0602 100%);
+    border-top: 2px solid var(--border);
+    border-right: 2px solid var(--border);
+    border-bottom: 2px solid var(--border);
+    border-left: none;
+    border-radius: 0 6px 6px 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(-900px);
+    will-change: opacity, transform;
+  }
+
+  .card.enter { animation: slideIn .65s cubic-bezier(.22,1,.36,1) forwards; }
+  .card.exit  { animation: slideOut .45s cubic-bezier(.55,0,1,.45) forwards; }
+
+  @keyframes slideIn {
+    from { opacity:0; transform: translateX(-900px); }
+    to   { opacity:1; transform: translateX(0); }
+  }
+  @keyframes slideOut {
+    from { opacity:1; transform: translateX(0); }
+    to   { opacity:0; transform: translateX(-900px); }
+  }
+
+  /* Left edge accent bar */
+  .accent-bar {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 8px;
+    background: linear-gradient(to bottom, var(--warm), var(--amber), var(--border));
+    transition: background .3s;
+  }
+
+  /* Glow overlay */
+  .card-glow {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 15% 50%, rgba(232,144,16,.08) 0%, transparent 65%);
+  }
+
+  /* Texture */
+  .card-texture {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      89deg,
+      transparent 0px, rgba(255,200,100,.015) 1px,
+      transparent 2px, transparent 14px
+    );
+    pointer-events: none;
+  }
+
+  /* ─── Inner layout ── */
+  .inner {
+    position: relative;
+    z-index: 2;
+    padding: 36px 48px 36px 36px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* Top row: icon + meta */
+  .top-row {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .icon-wrap {
+    flex-shrink: 0;
+    width: 100px; height: 100px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.4);
+    border: 1px solid #B8782055;
+    border-radius: 50%;
+    font-size: 120px;
+    filter: drop-shadow(0 0 18px var(--glow));
+    animation: iconPop .7s cubic-bezier(.34,1.56,.64,1);
+  }
+  .icon-wrap img {
+    width: 64px; height: 64px;
+    object-fit: contain;
+  }
+  .icon-wrap img.profile {
+    width: 140px; height: 140px;
+    object-fit: cover;
+    border-radius: 50%;
+    box-shadow: 0 0 20px rgba(184,120,32,.6);
+  }
+
+  @keyframes iconPop {
+    from { transform: scale(.3) rotate(-20deg); opacity:0; }
+    60%  { transform: scale(1.2) rotate(5deg); }
+    to   { transform: scale(1)   rotate(0deg); opacity:1; }
+  }
+
+  .meta {
+    flex: 1; min-width: 0;
+  }
+
+  .label {
+    font-family: 'Cinzel', serif;
+    font-size: 22px; font-weight: 400; letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 6px;
+    animation: fadeUp .5s .15s both;
+  }
+
+  .username {
+    font-family: 'Cinzel', serif;
+    font-size: 80px; font-weight: 900; line-height: 1.05;
+    color: var(--cream);
+    white-space: nowrap;
+    text-shadow: 0 0 40px rgba(240,192,80,.4);
+    animation: fadeUp .5s .25s both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity:0; transform: translateY(12px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
+
+  /* Action line */
+  .action-line {
+    font-family: 'Crimson Pro', serif;
+    font-size: 34px; font-weight: 300; font-style: italic;
+    color: var(--muted);
+    line-height: 1.3;
+    padding-left: 4px;
+    animation: fadeUp .5s .35s both;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .action-line .highlight {
+    color: var(--warm);
+    font-style: normal; font-weight: 600;
+  }
+
+  /* Message */
+  .msg-row {
+    background: rgba(0,0,0,.3);
+    border-left: 3px solid var(--border);
+    padding: 14px 20px;
+    border-radius: 0 4px 4px 0;
+    font-family: 'Crimson Pro', serif;
+    font-size: 30px; font-style: italic;
+    color: var(--muted);
+    line-height: 1.4;
+    animation: fadeUp .5s .45s both;
+    display: none;
+  }
+
+  /* ─── Waveform ── */
+  .waveform {
+    display: flex; align-items: center; gap: 5px;
+    height: 56px;
+    animation: fadeUp .5s .3s both;
+  }
+  .bar {
+    width: 6px; border-radius: 4px; min-height: 6px;
+    background: linear-gradient(to top, var(--border), var(--warm));
+    animation: barPulse var(--dur,.5s) ease-in-out infinite alternate;
+    animation-delay: var(--dly, 0s);
+  }
+  @keyframes barPulse {
+    from { height: var(--lo, 6px);  opacity:.4; }
+    to   { height: var(--hi, 44px); opacity:1;  }
+  }
+
+  /* ─── Floating notes ── */
+  .notes-layer {
+    position: absolute; inset: 0;
+    overflow: hidden; pointer-events: none; z-index: 1;
+  }
+  .fn {
+    position: absolute;
+    color: var(--gold);
+    opacity: 0;
+    animation: floatUp 3.5s ease-in-out forwards;
+    animation-delay: var(--d, 0s);
+    font-size: var(--sz, 18px);
+  }
+  @keyframes floatUp {
+    0%   { opacity:0;   transform: translateY(0) rotate(0deg); }
+    20%  { opacity:.5; }
+    80%  { opacity:.15; }
+    100% { opacity:0;   transform: translateY(-90px) rotate(28deg); }
+  }
+
+  /* ─── Progress bar ── */
+  .progress-track {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 4px;
+    background: rgba(255,255,255,.05);
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(to right, var(--border), var(--warm));
+    transform-origin: left;
+    animation: progressDrain linear forwards;
+    animation-duration: var(--pdur, 5s);
+  }
+  @keyframes progressDrain {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
+  }
+</style>
+<script src="config.js"></script>
+</head>
+<body>
+
+<!-- ── Social Scroller ── -->
+<div id="social-scroller">
+  <div class="social-entry" id="social-entry">
+    <div class="social-icon" id="social-icon">📺</div>
+    <div class="social-handle" id="social-handle">/neighborhoodofmusic</div>
+  </div>
+</div>
+
+<!-- ── Stats Widget ── -->
+<div id="stats-widget">
+  <div class="sw-bar-col" id="sw-goal-row">
+    <div class="sw-icon">🎯</div>
+    <div class="sw-track-v"><div class="sw-fill-v goal" id="sw-goal-fill"></div></div>
+    <div class="sw-label" id="sw-goal-title">$0</div>
+    <div class="sw-value" id="sw-goal-value">/ $500</div>
+  </div>
+  <div class="sw-bar-col" id="sw-steps-row">
+    <div class="sw-icon">👟</div>
+    <div class="sw-track-v"><div class="sw-fill-v steps" id="sw-steps-fill"></div></div>
+    <div class="sw-label">Steps</div>
+    <div class="sw-value" id="sw-steps-value">0</div>
+  </div>
+  <div class="sw-bar-col" id="sw-water-row">
+    <div class="sw-icon">💧</div>
+    <div class="sw-track-v"><div class="sw-fill-v water" id="sw-water-fill"></div></div>
+    <div class="sw-label">Water</div>
+    <div class="sw-value" id="sw-water-value">0ml</div>
+  </div>
+</div>
+
+<div id="stage">
+  <div class="card" id="card">
+    <div class="accent-bar" id="accent-bar"></div>
+    <div class="card-glow"></div>
+    <div class="card-texture"></div>
+    <div class="notes-layer" id="notes-layer"></div>
+
+    <div class="inner">
+      <div class="top-row">
+        <div class="icon-wrap" id="icon-wrap">♪</div>
+        <div class="meta">
+          <div class="label"  id="label">Alert</div>
+          <div class="username" id="username">Username</div>
+        </div>
+      </div>
+
+      <div class="action-line" id="action-line">joined the neighborhood!</div>
+      <div class="msg-row"    id="msg-row"></div>
+
+      <div class="waveform" id="waveform"></div>
+    </div>
+
+    <div class="channel-goal-bar" id="channel-goal-bar" style="display:none">
+      <div class="channel-goal-header">
+        <span class="channel-goal-label" id="channel-goal-label">Goal</span>
+        <span class="channel-goal-count" id="channel-goal-count"></span>
+      </div>
+      <div class="channel-goal-track"><div class="channel-goal-fill" id="channel-goal-fill"></div></div>
+    </div>
+
+    <div class="progress-track">
+      <div class="progress-fill" id="progress"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Bit gem helper ────────────────────────────────────────────────────────
+function bitGemUrl(amount) {
+  const n = Number(amount) || 0;
+  if (n >= 10000) return 'Assets/bits/10000.gif';
+  if (n >= 5000)  return 'Assets/bits/5000.gif';
+  if (n >= 1000)  return 'Assets/bits/1000.gif';
+  if (n >= 100)   return 'Assets/bits/100.gif';
+  return 'Assets/bits/1.gif';
+}
+
+// ─── Config ────────────────────────────────────────────────────────────────
+// ─── Theme System ──────────────────────────────────────────────────────────────
+let currentTheme = 'tavern';
+
+const THEME_OVERRIDES = {
+  tavern: {},
+  disney: {
+    follow:       { icon:'✨', action: u      => `${u} joined the neighborhood!`,            sub: () => 'Welcome to the neighborhood! ✨', color:'#9B59B6' },
+    sub:          { icon:'🎵', action: (u,a)  => `${u} became a member of the neighborhood!`,         sub: (u,a) => disneySubMsg(a),                          color:'#8E44AD' },
+    resub:        { icon:'🎶', action: (u,a)  => `${u} has been part of the neighborhood for ${a} months!`, sub: () => 'The neighborhood keeps growing! ✨',                color:'#7B2FBE' },
+    giftsub:      { icon:'🪄', action: (u,a)  => `${u} shared some gifts with the neighborhood!`, sub: (u,a) => `${a} membership${Number(a)>1?'s':''} gifted!`, color:'#9B59B6' },
+    bits:         { icon:'⭐', action: (u,a)  => `${u} sent ${a} stars to the neighborhood!`,             color:'#FFD700' },
+    raid:         { icon:'🏰', action: (u,a)  => `${u} led ${a} visitors to the neighborhood!`, sub: () => 'The neighborhood grows! 🏰',                     color:'#6C3483' },
+    tip:          { icon:'💫', action: (u,a)  => `${u} left a gift for the neighborhood!`,   sub: (u,a) => a ? `$${parseFloat(a).toFixed(2)} — thank you! ✨` : '', color:'#FFD700' },
+    yt_subscriber:{ icon:'🎬', action: u      => `${u} joined the neighborhood on YouTube!`, sub: () => 'The neighborhood keeps growing! ✨',                color:'#8E44AD' },
+    yt_superchat: { icon:'💬✨',action:(u,a)  => `${u} sent a message to the neighborhood!`,          color:'#6C3483' },
+    yt_member:    { icon:'👑', action: u      => `${u} became a member!`,                    sub: () => 'A new member of the neighborhood! ✨',                    color:'#9B59B6' },
+    yt_milestone: { icon:'🌟', action:(u,a)   => `${u} — ${a||'milestone'} months in the neighborhood!`,color:'#FFD700' },
+    yt_giftmember:{ icon:'🎁✨',action:(u,a)  => `${u} gifted ${a||1} membership${Number(a)>1?'s':''}!`, sub: () => 'Spreading the love! ✨', color:'#7B2FBE' },
+    watch_streak: { icon:'⭐', action: (u,a)  => `${u} — ${a} streams in a row!`,      sub: (u,a) => disneyStreakMsg(Number(a)||0),             color:'#FFD700' },
+    daily_checkin:{ icon:'🎤✨',action: u     => `${u} checked in for the soundcheck!`,      sub: () => 'Welcome to the neighborhood! ✨',                   color:'#9B59B6' },
+  },
+};
+
+function disneySubMsg(tier) {
+  const t = Number(tier);
+  if (t >= 3) return 'A true pillar of the neighborhood! ✨👑';
+  if (t >= 2) return 'A valued member of the neighborhood! ✨';
+  return 'A member of the neighborhood! ✨';
+}
+
+function disneyStreakMsg(n) {
+  if (n >= 100) return '✨ A true neighborhood legend!';
+  if (n >= 50)  return '✨ Truly part of the neighborhood!';
+  if (n >= 25)  return '✨ Living in the neighborhood, stream after stream!';
+  if (n >= 10)  return '✨ The neighborhood keeps calling them back!';
+  if (n >= 5)   return '✨ Feeling right at home!';
+  return '✨ Welcome to the neighborhood!';
+}
+
+let _baseConfigs = null;
+
+function applyTheme(name) {
+  currentTheme = name;
+  document.body.dataset.theme = name;
+  if (!_baseConfigs) {
+    _baseConfigs = {};
+    for (const key of Object.keys(CONFIGS)) _baseConfigs[key] = { ...CONFIGS[key] };
+  }
+  const overrides = THEME_OVERRIDES[name] || {};
+  for (const key of Object.keys(CONFIGS)) {
+    Object.assign(CONFIGS[key], _baseConfigs[key], overrides[key] || {});
+  }
+  try { localStorage.setItem('nom-theme', name); } catch(e) {}
+  console.log(`[theme] Switched to: ${name}`);
+}
+
+const CONFIGS = {
+  follow: {
+    label:   'New Follower',
+    action:  u => `${u} just joined the neighborhood!`,
+    sub:     null,
+    color:   '#E89010',
+    icon:    '♩',
+    dur:     5000,
+  },
+  sub: {
+    label:   'New Subscriber',
+    action:  (u,a) => `${u} subscribed!`,
+    sub:     (u,a) => `Tier ${a||1} · A round for the house!`,
+    color:   '#D4A840',
+    iconUrl: a => { const t=Number(a)||1; return t>=3?'Assets/sub5.png':t>=2?'Assets/sub3.png':'Assets/sub1.png'; },
+    dur:     6500,
+  },
+  resub: {
+    label:   'Resubscriber',
+    action:  (u,a) => `${u} returns!`,
+    sub:     (u,a) => `${a||1} month${a!==1?'s':''} of loyalty!`,
+    color:   '#C9A040',
+    iconUrl: a => { const m=Number(a)||1; return m>=24?'Assets/sub6.png':m>=12?'Assets/sub4.png':m>=6?'Assets/sub3.png':m>=3?'Assets/sub2.png':'Assets/sub1.png'; },
+    dur:     7000,
+  },
+  giftsub: {
+    label:   'Gift Subscription',
+    action:  (u,a) => `${u} is gifting!`,
+    sub:     (u,a) => `${a||1} sub${Number(a)>1?'s':''} to the community!`,
+    color:   '#E8A020',
+    iconUrl: a => Number(a)>1?'Assets/sub6.png':'Assets/sub4.png',
+    dur:     6500,
+  },
+  bits: {
+    label:   'Bits Cheered',
+    action:  (u,a) => `${u} cheered!`,
+    sub:     (u,a) => `${Number(a)||0} bits — ${bitsMsg(Number(a)||0)}`,
+    color:   '#FFD050',
+    iconUrl: a => bitGemUrl(a),
+    dur:     6000,
+  },
+  raid: {
+    label:   'Incoming Raid',
+    action:  (u,a) => `${u} is raiding!`,
+    sub:     (u,a) => `Bringing ${a||0} viewers to the neighborhood!`,
+    color:   '#E06830',
+    iconUrl: () => 'Assets/raid.gif',
+    dur:     7500,
+  },
+  tip: {
+    label:   'Tip Received',
+    action:  (u,a) => `${u} tipped!`,
+    sub:     (u,a) => `$${parseFloat(a||5).toFixed(2)} — the bard is grateful!`,
+    color:   '#F0C060',
+    icon:    '✦',
+    dur:     6500,
+  },
+  shoutout: {
+    label:   'Shoutout',
+    action:  u  => `Go show some love to ${u}!`,
+    sub:     null,
+    color:   '#A060E0',
+    icon:    '📣',
+    dur:     7000,
+  },
+  watch_streak: {
+    icon:    '🔥',
+    label:   'Watch Streak',
+    action:  (u,a) => `${u} is on a ${a}-stream streak!`,
+    sub:     (u,a) => streakMsg(Number(a)||0),
+    color:   '#FF6B35',
+    dur:     6000,
+  },
+  daily_checkin: {
+    icon:    '🎤',
+    label:   'Daily Check-In',
+    action:  (u)   => `${u} checked in for the soundcheck!`,
+    sub:     ()    => 'Welcome to the neighborhood!',
+    color:   '#9B59B6',
+    dur:     5500,
+  },
+  yt_subscriber: {
+    icon:    '▶',
+    label:   'New YouTube Sub',
+    action:  u => `${u} subscribed on YouTube!`,
+    sub:     () => 'Welcome to the neighborhood!',
+    color:   '#FF0000',
+    dur:     5000,
+  },
+  yt_superchat: {
+    icon:    '💬',
+    label:   'Super Chat',
+    action:  (u,a) => `${u} sent a Super Chat!`,
+    sub:     (u,a) => a ? `$${parseFloat(a).toFixed(2)}` : '',
+    color:   '#1565C0',
+    dur:     6500,
+  },
+  yt_supersticker: {
+    icon:    '🌟',
+    label:   'Super Sticker',
+    action:  (u,a) => `${u} sent a Super Sticker!`,
+    sub:     (u,a) => a ? `$${parseFloat(a).toFixed(2)}` : '',
+    color:   '#6A1B9A',
+    dur:     6000,
+  },
+  yt_member: {
+    icon:    '🏅',
+    label:   'New Member',
+    action:  u => `${u} joined as a member!`,
+    sub:     () => 'A new patron joins the neighborhood!',
+    color:   '#2E7D32',
+    dur:     6500,
+  },
+  yt_milestone: {
+    icon:    '🎖',
+    label:   'Member Milestone',
+    action:  (u,a) => `${u} — ${a||'milestone'} months!`,
+    sub:     () => 'A loyal member of the neighborhood!',
+    color:   '#F57F17',
+    dur:     6500,
+  },
+  yt_giftmember: {
+    icon:    '🎁',
+    label:   'Gift Membership',
+    action:  (u,a) => `${u} gifted ${a||1} membership${Number(a)>1?'s':''}!`,
+    sub:     () => 'Generosity echoes through the neighborhood!',
+    color:   '#AD1457',
+    dur:     6500,
+  },
+};
+
+function streakMsg(n) {
+  if (n >= 100) return 'A true legend of the neighborhood!';
+  if (n >= 50)  return 'Absolutely devoted to the neighborhood!';
+  if (n >= 25)  return 'A pillar of the neighborhood!';
+  if (n >= 10)  return 'A regular at the neighborhood!';
+  if (n >= 5)   return 'Becoming a neighborhood staple!';
+  return 'Building their streak!';
+}
+
+function bitsMsg(n) {
+  if (n >= 10000) return 'Legendary!';
+  if (n >= 5000)  return 'Royal bounty!';
+  if (n >= 1000)  return 'Generous patron!';
+  if (n >= 500)   return 'The bard plays on!';
+  return 'Every note counts!';
+}
+
+// ─── Queue ────────────────────────────────────────────────────────────────
+let queue   = [];
+let running = false;
+
+let alertsPaused = false;
+
+function showAlert(type, username = 'Someone', amount = null, message = null, goal = null) {
+  if (alertsPaused) {
+    console.log(`[panic] Alerts paused — dropped: ${type} from ${username}`);
+    return;
+  }
+  queue.push({ type, username, amount, message, goal });
+  if (!running) next();
+}
+
+function next() {
+  if (!queue.length) {
+    running = false;
+    // Restore stats widget with slight delay
+    setTimeout(() => {
+      document.getElementById('stats-widget').classList.remove('alert-active');
+    }, 300);
+    return;
+  }
+  running = true;
+  renderAlert(queue.shift());
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────
+function autoSizeText(el, minPx, maxPx) {
+  el.style.fontSize = maxPx + 'px';
+  el.style.whiteSpace = 'nowrap';
+  const parent = el.closest('.card') || el.parentElement;
+  if (!parent) return;
+  const available = parent.clientWidth - 160; // subtract icon + padding
+  while (el.scrollWidth > available && parseFloat(el.style.fontSize) > minPx) {
+    el.style.fontSize = (parseFloat(el.style.fontSize) - 1) + 'px';
+  }
+  if (parseFloat(el.style.fontSize) <= minPx) {
+    el.style.whiteSpace = 'normal'; // wrap as last resort
+  }
+}
+
+function renderAlert({ type, username, amount, message, goal }) {
+  const cfg = CONFIGS[type] || CONFIGS.follow;
+  const card = document.getElementById('card');
+
+  // Label
+  document.getElementById('label').textContent = cfg.label;
+  document.getElementById('label').style.color = cfg.color;
+
+  // Username + Action line (shoutouts hide username, show full sentence)
+  const actionText = typeof cfg.action === 'function' ? cfg.action(username, amount) : cfg.action;
+  if (type === 'shoutout') {
+    // Show: "Give some love to" (small, italic) then USERNAME (big, bold)
+    // action-line goes ABOVE username by moving it into meta div via order
+    const metaEl   = document.querySelector('.meta');
+    const actionEl = document.getElementById('action-line');
+    const unEl     = document.getElementById('username');
+
+    // Move action-line inside meta, before username
+    metaEl.insertBefore(actionEl, unEl);
+    actionEl.style.cssText = 'font-style:italic;font-size:13px;opacity:0.75;margin-bottom:2px;color:var(--cream);';
+    actionEl.innerHTML = 'Give some love to';
+
+    unEl.textContent    = username;
+    unEl.style.fontSize = 'clamp(18px, 5vw, 32px)';
+    unEl.style.color    = cfg.color;
+  } else {
+    // Restore action-line below top-row
+    const inner    = document.querySelector('.inner');
+    const actionEl = document.getElementById('action-line');
+    const msgRow   = document.getElementById('msg-row');
+    if (actionEl.parentElement !== inner) {
+      inner.insertBefore(actionEl, msgRow);
+    }
+    actionEl.style.cssText = '';
+    const unEl2 = document.getElementById('username');
+    unEl2.style.fontSize = '80px';
+    unEl2.textContent    = username;
+    unEl2.style.color    = cfg.color;
+    autoSizeText(unEl2, 24, 80);
+    actionEl.innerHTML = actionText;
+  }
+
+  // Sub line
+  const subText = typeof cfg.sub === 'function' ? cfg.sub(username, amount) : cfg.sub;
+  const msgEl   = document.getElementById('msg-row');
+  if (subText) {
+    msgEl.textContent    = subText;
+    msgEl.style.display  = 'block';
+    msgEl.style.borderLeftColor = cfg.color;
+  } else {
+    msgEl.style.display = 'none';
+  }
+
+  // Message (from viewer)
+  if (message && !subText) {
+    msgEl.textContent    = `"${message}"`;
+    msgEl.style.display  = 'block';
+    msgEl.style.borderLeftColor = cfg.color;
+  } else if (message && subText) {
+    msgEl.textContent    = `${subText} · "${message}"`;
+  }
+
+  // Channel goal bar
+  const goalBar = document.getElementById('channel-goal-bar');
+  if (goal && goalBar) {
+    const pct = goal.target > 0 ? Math.min((goal.current / goal.target) * 100, 100) : 0;
+    goalBar.style.display = '';
+    document.getElementById('channel-goal-label').textContent =
+      goal.description || (goal.type === 'follower' ? 'Follower Goal' : 'Subscriber Goal');
+    document.getElementById('channel-goal-count').textContent =
+      `${goal.current.toLocaleString()} / ${goal.target.toLocaleString()}`;
+    document.getElementById('channel-goal-fill').style.width = pct + '%';
+  } else if (goalBar) {
+    goalBar.style.display = 'none';
+  }
+
+  // Icon
+  const iconWrap = document.getElementById('icon-wrap');
+  if (cfg.iconUrl) {
+    const url       = cfg.iconUrl(amount);
+    const isProfile = type === 'shoutout' && url && !url.startsWith('Assets');
+    iconWrap.innerHTML = url
+      ? `<img src="${url}" class="${isProfile ? 'profile' : ''}" alt="${type}">`
+      : cfg.icon || '♪';
+  } else {
+    iconWrap.textContent = cfg.icon || '♪';
+    iconWrap.style.fontSize = '52px';
+  }
+
+  // Accent bar color
+  document.getElementById('accent-bar').style.background =
+    `linear-gradient(to bottom, ${cfg.color}, ${cfg.color}88, ${cfg.color}44)`;
+
+  // Waveform
+  buildWaveform(18, cfg.color);
+
+  // Floating notes
+  spawnNotes(12);
+
+  // Progress bar
+  const prog = document.getElementById('progress');
+  prog.style.animation = 'none';
+  void prog.offsetWidth;
+  prog.style.setProperty('--pdur', cfg.dur + 'ms');
+  prog.style.animation = '';
+
+  // Sound
+  playAlertSound(type);
+
+  // Hide stats widget while alert is showing
+  document.getElementById('stats-widget').classList.add('alert-active');
+
+  // Animate in
+  card.classList.remove('enter', 'exit');
+  void card.offsetWidth;
+  card.classList.add('enter');
+
+  setTimeout(() => {
+    card.classList.remove('enter');
+    card.classList.add('exit');
+    setTimeout(() => {
+      card.classList.remove('exit');
+      next();
+    }, 480);
+  }, cfg.dur);
+}
+
+// ─── Waveform ─────────────────────────────────────────────────────────────
+function buildWaveform(count, color) {
+  const wf = document.getElementById('waveform');
+  wf.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    const lo  = 6  + Math.random() * 10;
+    const hi  = 20 + Math.random() * 34;
+    const dur = 0.3 + Math.random() * 0.45;
+    const dly = (i / count) * 0.5;
+    bar.style.setProperty('--lo',  lo  + 'px');
+    bar.style.setProperty('--hi',  hi  + 'px');
+    bar.style.setProperty('--dur', dur + 's');
+    bar.style.setProperty('--dly', dly + 's');
+    bar.style.background = `linear-gradient(to top, ${color}88, ${color})`;
+    wf.appendChild(bar);
+  }
+}
+
+// ─── Floating Notes ────────────────────────────────────────────────────────
+const NOTE_CHARS = ['♩','♪','♫','♬','𝄞'];
+function spawnNotes(n) {
+  const layer = document.getElementById('notes-layer');
+  layer.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const el = document.createElement('div');
+    el.className = 'fn';
+    el.textContent = NOTE_CHARS[Math.floor(Math.random() * NOTE_CHARS.length)];
+    el.style.left   = (5  + Math.random() * 90) + '%';
+    el.style.bottom = (5  + Math.random() * 60) + '%';
+    el.style.setProperty('--d',  (Math.random() * 2) + 's');
+    el.style.setProperty('--sz', (14 + Math.random() * 20) + 'px');
+    layer.appendChild(el);
+  }
+}
+
+// ─── Sound ────────────────────────────────────────────────────────────────
+const SOUNDS = {
+  follow:  'Assets/Sounds/new-Follower.wav',
+  sub:     null,
+  resub:   null,
+  giftsub: null,
+  bits:    null,
+  raid:    null,
+  tip:     null,
+};
+const SOUND_VOLUME = (typeof CONFIG !== 'undefined' && CONFIG.soundVolume != null) ? CONFIG.soundVolume : 0.8;
+
+const audioCache = {};
+function preloadSounds() {
+  for (const [type, src] of Object.entries(SOUNDS)) {
+    if (!src) continue;
+    const audio = new Audio(src);
+    audio.volume = SOUND_VOLUME;
+    audio.load();
+    audioCache[type] = audio;
+  }
+}
+
+function playAlertSound(type) {
+  const src = SOUNDS[type];
+  if (!src) return;
+  let audio = audioCache[type];
+  if (!audio) {
+    audio = new Audio(src);
+    audio.volume = SOUND_VOLUME;
+    audioCache[type] = audio;
+  }
+  audio.currentTime = 0;
+  audio.volume = SOUND_VOLUME;
+  audio.play().catch(e => console.log(`[sound error: ${e.message}]`));
+}
+
+preloadSounds();
+
+// Load persisted theme
+(function() {
+  try {
+    const saved = localStorage.getItem('nom-theme');
+    if (saved && saved !== 'tavern') applyTheme(saved);
+    else document.body.dataset.theme = 'tavern';
+  } catch(e) { document.body.dataset.theme = 'tavern'; }
+})();
+
+// ─── Shoutout helper ──────────────────────────────────────────────────────
+let soCooldown = false;
+let TWITCH_CLIENT_ID = (typeof CONFIG !== 'undefined') ? CONFIG.twitchClientId : null;
+let TWITCH_TOKEN     = null;
+
+async function initTwitchToken() {
+  const brokerUrl = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
+    ? CONFIG.tokenBrokerUrl
+    : 'http://192.168.6.228:3010/token';
+  try {
+    const res  = await fetch(brokerUrl);
+    const data = await res.json();
+    if (data.token) {
+      TWITCH_TOKEN     = data.token;
+      TWITCH_CLIENT_ID = data.clientId || TWITCH_CLIENT_ID;
+      console.log('[twitch token] Loaded from broker ✓');
+    }
+  } catch (e) { console.log(`[twitch token] Could not reach broker: ${e.message}`); }
+}
+
+async function fireShoutout(username, profileUrl, game) {
+  if (soCooldown) return;
+  soCooldown = true;
+  setTimeout(() => soCooldown = false, 10000);
+
+  // If token not ready yet, wait up to 3s for it
+  if (!TWITCH_TOKEN) {
+    for (let i = 0; i < 6; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      if (TWITCH_TOKEN) break;
+    }
+  }
+
+  if (!profileUrl && TWITCH_TOKEN) {
+    try {
+      const headers = { 'Client-ID': TWITCH_CLIENT_ID, 'Authorization': `Bearer ${TWITCH_TOKEN}` };
+      const uRes    = await fetch(`https://api.twitch.tv/helix/users?login=${encodeURIComponent(username)}`, { headers });
+      const uData   = await uRes.json();
+      const user    = uData.data?.[0];
+      if (user) {
+        profileUrl = user.profile_image_url;
+        if (!game) {
+          const cRes  = await fetch(`https://api.twitch.tv/helix/channels?broadcaster_id=${user.id}`, { headers });
+          const cData = await cRes.json();
+          game = cData.data?.[0]?.game_name || null;
+        }
+      }
+    } catch (e) { console.log(`[shoutout] API error: ${e.message}`); }
+  }
+  CONFIGS.shoutout.iconUrl = () => profileUrl || null;
+  CONFIGS.shoutout.sub     = () => game ? `They were last playing: ${game}` : 'Go show them some love!';
+  showAlert('shoutout', username, null, null);
+  console.log(`[shoutout: ${username} | game: ${game}]`);
+}
+
+// ─── Stats Widget ─────────────────────────────────────────────────────────────
+const BROKER_BASE = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
+  ? CONFIG.tokenBrokerUrl.replace('/token', '')
+  : 'http://192.168.6.228:3010';
+
+let swGoalState   = { bits: 0, subs: 0, tips: 0, title: 'Stream Goal', amount: 500, visible: true };
+let swHealthState = { steps: true, water: true };
+
+function updateGoalBar() {
+  if (!swGoalState.visible) {
+    document.getElementById('sw-goal-row').style.display = 'none';
+    return;
+  }
+  document.getElementById('sw-goal-row').style.display = '';
+  const total = (swGoalState.bits || 0) + (swGoalState.subs || 0) + (swGoalState.tips || 0);
+  const pct   = Math.min((total / (swGoalState.amount || 500)) * 100, 100);
+  document.getElementById('sw-goal-fill').style.height  = pct + '%';
+  document.getElementById('sw-goal-title').textContent  = `$${total.toFixed(0)}`;
+  document.getElementById('sw-goal-value').textContent  = `/ $${swGoalState.amount}`;
+}
+
+function updateHealthBars(steps, water) {
+  const stepsPct = Math.min((steps / 10000) * 100, 100);
+  const waterPct = Math.min((water / 2000) * 100, 100);
+  document.getElementById('sw-steps-fill').style.height = stepsPct + '%';
+  document.getElementById('sw-water-fill').style.height = waterPct + '%';
+  document.getElementById('sw-steps-value').textContent = steps >= 1000
+    ? (steps / 1000).toFixed(1) + 'K'
+    : steps.toString();
+  document.getElementById('sw-water-value').textContent = water + 'ml';
+}
+
+function applyHealthVisibility() {
+  document.getElementById('sw-steps-row').style.display = swHealthState.steps ? '' : 'none';
+  document.getElementById('sw-water-row').style.display = swHealthState.water ? '' : 'none';
+}
+
+async function initStatsWidget() {
+  // Load goal state
+  try {
+    const res  = await fetch(`${BROKER_BASE}/goal-state`);
+    const data = await res.json();
+    Object.assign(swGoalState, data);
+    updateGoalBar();
+  } catch(e) { console.log('[stats] goal fetch failed:', e.message); }
+
+  // Load health settings
+  try {
+    const res  = await fetch(`${BROKER_BASE}/health-settings`);
+    const data = await res.json();
+    Object.assign(swHealthState, data);
+    applyHealthVisibility();
+  } catch(e) {}
+
+  // Load health data
+  try {
+    const res  = await fetch(`${BROKER_BASE}/health-data`);
+    const data = await res.json();
+    updateHealthBars(data.steps || 0, data.water || 0);
+  } catch(e) { console.log('[stats] health fetch failed:', e.message); }
+
+  // Poll health every 60s
+  setInterval(async () => {
+    try {
+      const res  = await fetch(`${BROKER_BASE}/health-data`);
+      const data = await res.json();
+      updateHealthBars(data.steps || 0, data.water || 0);
+    } catch(e) {}
+  }, 60000);
+}
+
+// ─── Social Scroller ──────────────────────────────────────────────────────────
+const DEFAULT_SOCIAL_CONFIG = [
+  { enabled: true,  icon: '🟣', handle: '/neighborhoodofmusic', label: 'Twitch' },
+  { enabled: true,  icon: '🎵', handle: '@musicman0917',         label: 'TikTok' },
+  { enabled: true,  icon: 'https://cdn.simpleicons.org/twitter', handle: '@NomusicNom', label: 'Twitter' },
+  { enabled: true,  icon: 'https://cdn.simpleicons.org/youtube', handle: 'NeighborhoodofMusic', label: 'YouTube' },
+  { enabled: true,  icon: 'https://cdn.simpleicons.org/bluesky', handle: '@neighborhoodofmusic', label: 'Bluesky' },
+  { enabled: true,  icon: 'https://cdn.simpleicons.org/discord', handle: 'discord.gg/nom', label: 'Discord' },
+];
+
+let socialConfig  = [...DEFAULT_SOCIAL_CONFIG];
+let socialIndex   = 0;
+let socialTimeout = null;
+
+async function initSocialScroller() {
+  try {
+    const res  = await fetch(`${BROKER_BASE}/social-config`);
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) socialConfig = data;
+  } catch(e) {}
+  runSocialScroller();
+}
+
+function runSocialScroller() {
+  const entries = socialConfig.filter(e => e.enabled);
+  if (!entries.length) return;
+  if (socialIndex >= entries.length) socialIndex = 0;
+  showSocialEntry(entries[socialIndex]);
+  socialIndex = (socialIndex + 1) % entries.length;
+}
+
+function showSocialEntry(entry) {
+  const el      = document.getElementById('social-entry');
+  const iconEl  = document.getElementById('social-icon');
+  const handleEl= document.getElementById('social-handle');
+
+  const isUrl = entry.icon && entry.icon.startsWith('http');
+  if (isUrl) {
+    iconEl.style.display = '';
+    iconEl.innerHTML = `<img src="${entry.icon}" style="width:120px;height:120px;object-fit:contain;border-radius:12px;filter:drop-shadow(0 0 8px rgba(255,255,255,.2)) brightness(1.2);" onerror="this.style.display='none'">`;
+  } else if (entry.icon) {
+    iconEl.style.display = '';
+    iconEl.textContent = entry.icon;
+  } else {
+    // No icon — hide the icon slot entirely
+    iconEl.style.display = 'none';
+    iconEl.innerHTML = '';
+  }
+  handleEl.textContent = entry.handle || '';
+
+  // Bounce in
+  el.classList.remove('bounce-in', 'bounce-out');
+  void el.offsetWidth;
+  el.classList.add('bounce-in');
+
+  // Hold, then bounce out, then next
+  socialTimeout = setTimeout(() => {
+    el.classList.remove('bounce-in');
+    el.classList.add('bounce-out');
+    setTimeout(() => {
+      el.classList.remove('bounce-out');
+      runSocialScroller();
+    }, 420);
+  }, 5000);
+}
+
+function reloadSocialConfig(data) {
+  if (Array.isArray(data)) {
+    socialConfig = data;
+    socialIndex  = 0;
+    clearTimeout(socialTimeout);
+    const el = document.getElementById('social-entry');
+    el.classList.remove('bounce-in', 'bounce-out');
+    runSocialScroller();
+  }
+}
+
+// ─── Streamer.bot WebSocket (YouTube + Fourthwall) ───────────────────────────
+function connectStreamerBot() {
+  const sbUrl = (typeof CONFIG !== 'undefined' && CONFIG.streamerbotUrl)
+    ? CONFIG.streamerbotUrl : 'ws://127.0.0.1:8080';
+
+  const ws = new WebSocket(sbUrl);
+  ws.onopen = () => {
+    ws.send(JSON.stringify({
+      request: 'Subscribe',
+      id: 'nom-mobile',
+      events: {
+        Fourthwall: ['Donation'],
+        Twitch:     ['TwitchWatchStreak','RewardRedemption'],
+        YouTube:    ['NewSubscriber','SuperChat','SuperSticker','NewSponsor','MemberMileStone','MembershipGift','GiftMembershipReceived'],
+      },
+    }));
+  };
+  ws.onmessage = ({ data }) => {
+    let msg;
+    try { msg = JSON.parse(data); } catch { return; }
+    const src  = msg?.event?.source;
+    const type = msg?.event?.type;
+    const d    = msg?.data || {};
+    if (!src || !type) return;
+
+    if (src === 'Fourthwall' && type === 'Donation') {
+      const name   = d.name || d.user?.name || 'Someone';
+      const amount = d.amount != null ? d.amount / 100 : d.total ?? 0;
+      showAlert('tip', name, amount, d.message || null);
+      return;
+    }
+
+    if (src === 'Twitch' && type === 'RewardRedemption') {
+      const rewardTitle = d.reward?.title || d.rewardTitle || '';
+      if (rewardTitle.includes('Daily check-in') || rewardTitle.includes('Daily Check-In')) {
+        const name = d.user_name || d.user?.name || d.userName || 'Someone';
+        showAlert('daily_checkin', name, null, null);
+      }
+      return;
+    }
+
+    if (src === 'Twitch' && type === 'TwitchWatchStreak') {
+      const name   = d.user || d.userName || 'Someone';
+      const streak = d.watchStreak || d.streak || '?';
+      showAlert('watch_streak', name, streak, null);
+      return;
+    }
+
+    if (src === 'YouTube') {
+      const name = d.user?.name || d.displayName || d.userName || 'Someone';
+      switch (type) {
+        case 'NewSubscriber':    showAlert('yt_subscriber', name, null, null); break;
+        case 'SuperChat':        showAlert('yt_superchat', name, d.amount ?? d.amountValue ?? null, d.message ?? null); break;
+        case 'SuperSticker':     showAlert('yt_supersticker', name, d.amount ?? null, null); break;
+        case 'NewSponsor':       showAlert('yt_member', name, null, null); break;
+        case 'MemberMileStone':  showAlert('yt_milestone', name, d.monthCount ?? null, null); break;
+        case 'MembershipGift':
+        case 'GiftMembershipReceived': showAlert('yt_giftmember', name, d.count ?? 1, null); break;
+      }
+    }
+  };
+  ws.onclose = () => setTimeout(connectStreamerBot, 3000);
+}
+
+// ─── SSE Alert Bus ────────────────────────────────────────────────────────
+function connectAlertBus() {
+  const brokerBase = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
+    ? CONFIG.tokenBrokerUrl.replace('/token', '')
+    : 'http://192.168.6.228:3010';
+
+  const es = new EventSource(`${brokerBase}/alerts-stream`);
+
+  es.onopen = () => console.log('[alert bus] SSE open');
+
+  es.onmessage = (e) => {
+    let payload;
+    try { payload = JSON.parse(e.data); } catch { return; }
+    if (payload.type === 'connected') { console.log('[alert bus] Connected ✓'); return; }
+    if (payload.type === 'theme-switch') { applyTheme(payload.theme); return; }
+    if (payload.type === 'goal-update' && payload.goal) {
+      Object.assign(swGoalState, payload.goal);
+      updateGoalBar();
+      return;
+    }
+    if (payload.type === 'goal-toggle') {
+      swGoalState.visible = payload.visible;
+      updateGoalBar();
+      return;
+    }
+    if (payload.type === 'health-toggle') {
+      swHealthState[payload.tracker] = payload.enabled;
+      applyHealthVisibility();
+      return;
+    }
+    if (payload.type === 'social-scroller-toggle') {
+      const scroller = document.getElementById('social-scroller');
+      if (scroller) scroller.style.display = payload.enabled ? '' : 'none';
+      return;
+    }
+    if (payload.type === 'social-config') {
+      reloadSocialConfig(payload.config);
+      return;
+    }
+    // Mobile has no widgets for these — ignore so they don't fall through to a fake alert
+    if (payload.type === 'hype_train' || payload.type === 'poll' || payload.type === 'prediction') {
+      return;
+    }
+    // Panic button — pause/resume all alerts
+    if (payload.type === 'alerts-paused') {
+      alertsPaused = !!payload.paused;
+      if (alertsPaused) queue.length = 0;
+      console.log(`[panic] Alerts ${alertsPaused ? 'PAUSED' : 'resumed'}`);
+      return;
+    }
+    if (payload.type === 'shoutout') {
+      fireShoutout(payload.username, payload.profileUrl || null, payload.game || null);
+    } else if (payload.type) {
+      showAlert(payload.type, payload.username || 'Someone', payload.amount ?? null, payload.message ?? null, payload.goal ?? null);
+    }
+  };
+
+  es.onerror = () => console.log('[alert bus] SSE error — auto-reconnecting');
+}
+
+initTwitchToken();
+connectAlertBus();
+connectStreamerBot();
+initStatsWidget();
+// Fetch social scroller enabled state on load
+(async function() {
+  const base = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
+    ? CONFIG.tokenBrokerUrl.replace('/token', '')
+    : 'http://192.168.6.228:3010';
+  try {
+    const res  = await fetch(`${base}/social-scroller-state`);
+    const data = await res.json();
+    if (data.enabled === false) {
+      const scroller = document.getElementById('social-scroller');
+      if (scroller) scroller.style.display = 'none';
+    }
+  } catch(e) {}
+})();
+initSocialScroller();
+
+// Fetch panic state on load in case overlay refreshed mid-pause
+(async function checkPanicState() {
+  const base = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
+    ? CONFIG.tokenBrokerUrl.replace('/token', '')
+    : 'http://192.168.6.228:3010';
+  try {
+    const res  = await fetch(`${base}/alerts-paused-state`);
+    const data = await res.json();
+    alertsPaused = !!data.paused;
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>

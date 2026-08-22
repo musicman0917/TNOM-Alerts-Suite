@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fitbit Auth — Stepcounter</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Crimson+Pro:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #180C04; color: #F2E4CC;
+    font-family: 'Crimson Pro', serif;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 40px 20px;
+  }
+  .card {
+    background: linear-gradient(155deg, #2A1508, #180C04);
+    border: 1px solid #B87820; border-radius: 4px;
+    padding: 40px 48px; max-width: 560px; width: 100%; text-align: center;
+  }
+  h1 { font-family:'Cinzel',serif; font-size:16px; letter-spacing:.2em; color:#E89010; margin-bottom:8px; }
+  .sub { font-style:italic; color:#C0986A; margin-bottom:28px; font-size:15px; }
+  .step { background:rgba(255,255,255,.04); border:1px solid #B8782033; border-radius:3px; padding:14px 18px; margin-bottom:12px; text-align:left; }
+  .step-num { font-family:'Cinzel',serif; font-size:9px; letter-spacing:.15em; color:#E89010; margin-bottom:5px; }
+  .step p { font-size:14px; color:#C0986A; line-height:1.5; }
+  button {
+    background:linear-gradient(135deg,#3A2010,#2A1508); border:1px solid #B87820;
+    border-radius:3px; color:#F2E4CC; font-family:'Cinzel',serif;
+    font-size:12px; letter-spacing:.12em; padding:13px 32px; cursor:pointer;
+    width:100%; margin-top:8px; transition:box-shadow .2s, border-color .2s;
+  }
+  button:hover { border-color:#E89010; box-shadow:0 0 16px rgba(232,144,16,.3); }
+  #token-box { display:none; margin-top:20px; background:rgba(0,0,0,.5); border:1px solid #E89010; border-radius:3px; padding:18px; }
+  .label { font-family:'Cinzel',serif; font-size:9px; letter-spacing:.15em; color:#E89010; margin-bottom:6px; }
+  .token-val { font-size:12px; color:#F0C060; word-break:break-all; text-align:left; background:rgba(0,0,0,.4); border:1px solid #B8782044; border-radius:2px; padding:8px 10px; }
+  .success { color:#4CAF50; font-style:italic; font-size:13px; margin-top:8px; }
+  .instructions { background:rgba(0,0,0,.4); border:1px solid #B8782033; border-radius:3px; padding:14px; margin-top:16px; text-align:left; font-size:13px; color:#C0986A; line-height:1.8; }
+  .instructions code { background:rgba(255,255,255,.08); padding:1px 5px; border-radius:2px; font-size:12px; color:#F0C060; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>♩ FITBIT RE-AUTH ♩</h1>
+  <p class="sub">Stepcounter token refresh</p>
+
+  <div class="step">
+    <div class="step-num">STEP 1</div>
+    <p>Click Authorize. Fitbit will redirect to <code>http://localhost/callback</code> — your browser will show an error page. That's fine.</p>
+  </div>
+  <div class="step">
+    <div class="step-num">STEP 2</div>
+    <p>Copy the full URL from the address bar and paste it back into <em>this</em> tab's address bar, then hit Enter. The page will extract your tokens automatically.</p>
+  </div>
+
+  <button onclick="authorize()">♩ Authorize with Fitbit</button>
+
+  <div id="token-box">
+    <div class="label">ACCESS TOKEN</div>
+    <div class="token-val" id="access-val"></div>
+    <div class="label" style="margin-top:12px;">REFRESH TOKEN</div>
+    <div class="token-val" id="refresh-val"></div>
+    <button id="copy-btn" onclick="copyInstructions()" style="margin-top:12px;">Copy .env Update Commands</button>
+    <div class="success" id="copy-confirm" style="display:none">✓ Copied!</div>
+
+    <div class="instructions" id="env-instructions"></div>
+  </div>
+</div>
+
+<script>
+  const CLIENT_ID    = '23QNSH';
+  const REDIRECT_URI = 'http://localhost/callback';
+  const SCOPES       = 'activity nutrition';
+
+  function authorize() {
+    const url = new URL('https://www.fitbit.com/oauth2/authorize');
+    url.searchParams.set('response_type', 'code');
+    url.searchParams.set('client_id',     CLIENT_ID);
+    url.searchParams.set('redirect_uri',  REDIRECT_URI);
+    url.searchParams.set('scope',         SCOPES);
+    url.searchParams.set('expires_in',    '604800'); // 7 days
+    window.location.href = url.toString();
+  }
+
+  // If redirected back with a code, show instructions
+  // Note: Fitbit uses auth code flow — we can't exchange server-side from here
+  // So we show the code and instructions for manual exchange
+  function checkUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const code   = params.get('code');
+    if (!code) return;
+
+    history.replaceState(null, '', window.location.pathname);
+
+    document.getElementById('token-box').style.display = 'block';
+    document.getElementById('access-val').textContent  = code;
+    document.getElementById('refresh-val').textContent = '(run the PowerShell command below to exchange)';
+
+    const cmd = `# Run this in PowerShell on the server:\n$body = "grant_type=authorization_code&code=${code}&redirect_uri=http%3A%2F%2Flocalhost%2Fcallback"\n$auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("23QNSH:d53e724653ccd6a745f203127ab9ee77"))\n$r = Invoke-RestMethod -Uri "https://api.fitbit.com/oauth2/token" -Method POST -Headers @{Authorization="Basic $auth"; "Content-Type"="application/x-www-form-urlencoded"} -Body $body\nWrite-Host "ACCESS TOKEN: $($r.access_token)"\nWrite-Host "REFRESH TOKEN: $($r.refresh_token)"\n\n# Then update C:\\Users\\music\\Documents\\Stepcounter\\.env:\n# FITBIT_ACCESS_TOKEN=<access token above>\n# FITBIT_REFRESH_TOKEN=<refresh token above>\n# Then run: pm2 restart stepcounter`;
+
+    document.getElementById('env-instructions').innerHTML =
+      '<strong style="color:#E89010;font-family:Cinzel,serif;font-size:10px;letter-spacing:.15em;">NEXT STEPS</strong><br><br>' +
+      cmd.replace(/\n/g, '<br>').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+         .replace(/&lt;br&gt;/g, '<br>');
+
+    window._copyCmd = cmd;
+  }
+
+  function copyInstructions() {
+    navigator.clipboard.writeText(window._copyCmd || '').then(() => {
+      const c = document.getElementById('copy-confirm');
+      c.style.display = 'block';
+      setTimeout(() => c.style.display = 'none', 2500);
+    });
+  }
+
+  checkUrl();
+</script>
+</body>
+</html>
