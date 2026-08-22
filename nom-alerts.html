@@ -537,6 +537,84 @@
   .ht-l4 .ht-hype-msg { color: #FF0080; }
   .ht-l5 .ht-hype-msg { color: #BF00FF; }
 
+  /* ─── Giveaway Widget (persistent corner) ────────────── */
+  #giveaway-widget {
+    position: fixed;
+    bottom: 30px; left: 30px;
+    width: 220px;
+    background: linear-gradient(155deg, #2A1508, #180C04);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .4s;
+    box-shadow: 0 4px 24px rgba(0,0,0,.6);
+  }
+  #giveaway-widget.visible { opacity: 1; }
+
+  .gw-title {
+    font-family: 'Cinzel', serif;
+    font-size: 10px; letter-spacing: .15em; text-transform: uppercase;
+    color: var(--amber); margin-bottom: 4px;
+  }
+  .gw-keyword {
+    font-family: 'Crimson Pro', serif;
+    font-size: 14px; font-weight: 600;
+    color: var(--cream); margin-bottom: 4px;
+  }
+  .gw-count {
+    font-family: 'Crimson Pro', serif;
+    font-size: 11px; font-style: italic;
+    color: var(--muted);
+  }
+
+  /* ─── Giveaway Winner Reveal (takeover) ──────────────── */
+  #giveaway-reveal {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(.9);
+    width: 560px;
+    text-align: center;
+    background: linear-gradient(155deg, #2A1508, #180C04);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 32px 24px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .4s, transform .4s;
+    box-shadow: 0 0 60px var(--glow-rgba), 0 8px 40px rgba(0,0,0,.7);
+    z-index: 50;
+  }
+  #giveaway-reveal.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+  .gr-title {
+    font-family: 'Cinzel', serif;
+    font-size: 16px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--amber); margin-bottom: 18px;
+  }
+  .gr-name {
+    font-family: 'Cinzel', serif;
+    font-size: 44px; font-weight: 700;
+    color: var(--warm);
+    text-shadow: 0 0 20px var(--glow-rgba);
+    margin-bottom: 10px;
+    min-height: 56px;
+  }
+  .gr-name.landed {
+    animation: giveawayLand .6s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes giveawayLand {
+    0%   { transform: scale(1.3); }
+    60%  { transform: scale(0.94); }
+    100% { transform: scale(1); }
+  }
+  .gr-sub {
+    font-family: 'Crimson Pro', serif;
+    font-size: 14px; font-style: italic;
+    color: var(--muted);
+  }
+
   /* ─── Music Notes ───────────────────────────────────── */
   .music-note {
     position: fixed;
@@ -838,6 +916,20 @@
     <span class="pw-status" id="pred-status"></span>
     <span id="pred-timer"></span>
   </div>
+</div>
+
+<!-- ── Giveaway Widget (persistent, collecting entries) ── -->
+<div id="giveaway-widget">
+  <div class="gw-title">🎉 Giveaway</div>
+  <div class="gw-keyword" id="giveaway-keyword">Type !enter to win!</div>
+  <div class="gw-count" id="giveaway-count">0 entered</div>
+</div>
+
+<!-- ── Giveaway Winner Reveal (takeover) ── -->
+<div id="giveaway-reveal">
+  <div class="gr-title">🎉 Drawing a Winner 🎉</div>
+  <div class="gr-name" id="giveaway-reveal-name">&nbsp;</div>
+  <div class="gr-sub" id="giveaway-reveal-sub"></div>
 </div>
 
 <!-- ── Alert Stage ── -->
@@ -1209,6 +1301,68 @@ function renderPrediction(data) {
 
   widget.classList.add('visible');
   updateWidgetStacking();
+}
+
+// ─── Giveaway ──────────────────────────────────────────────────────────────
+let giveawayShuffleInterval = null;
+
+function renderGiveaway(data) {
+  const widget    = document.getElementById('giveaway-widget');
+  const keywordEl = document.getElementById('giveaway-keyword');
+  const countEl   = document.getElementById('giveaway-count');
+  const reveal    = document.getElementById('giveaway-reveal');
+  const nameEl    = document.getElementById('giveaway-reveal-name');
+  const subEl     = document.getElementById('giveaway-reveal-sub');
+
+  if (data.status === 'started' || data.status === 'active') {
+    keywordEl.textContent = `Type ${data.keyword} to win!`;
+    countEl.textContent   = `${data.count || 0} entered`;
+    widget.classList.add('visible');
+    return;
+  }
+
+  if (data.status === 'stopped') {
+    countEl.textContent = `${data.count || 0} entered — entries closed`;
+    return;
+  }
+
+  if (data.status === 'drawing') {
+    widget.classList.remove('visible');
+    clearInterval(giveawayShuffleInterval);
+
+    const entries = (data.entries && data.entries.length) ? data.entries : [data.winner];
+    subEl.textContent = `${data.count || entries.length} entries`;
+    nameEl.classList.remove('landed');
+    reveal.classList.add('visible');
+
+    giveawayShuffleInterval = setInterval(() => {
+      nameEl.textContent = entries[Math.floor(Math.random() * entries.length)];
+    }, 80);
+
+    setTimeout(() => {
+      clearInterval(giveawayShuffleInterval);
+      nameEl.textContent = data.winner;
+      nameEl.classList.add('landed');
+      subEl.textContent = '🏆 Winner!';
+      spawnNoteBurst(5);
+    }, 2200);
+
+    setTimeout(() => {
+      reveal.classList.remove('visible');
+      keywordEl.textContent = `🏆 Winner: ${data.winner}`;
+      countEl.textContent   = 'Congrats!';
+      widget.classList.add('visible');
+    }, 12000);
+    return;
+  }
+
+  if (data.status === 'reset') {
+    clearInterval(giveawayShuffleInterval);
+    widget.classList.remove('visible');
+    reveal.classList.remove('visible');
+    countEl.textContent = '0 entered';
+    return;
+  }
 }
 
 // ─── Music Notes ─────────────────────────────────────────────────────────────
@@ -2280,6 +2434,12 @@ function connectAlertBus() {
     // Prediction update
     if (payload.type === 'prediction') {
       renderPrediction(payload);
+      return;
+    }
+
+    // Giveaway update
+    if (payload.type === 'giveaway') {
+      renderGiveaway(payload);
       return;
     }
 

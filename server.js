@@ -41,6 +41,7 @@ const SCOPES = [
   'channel:read:predictions',
   'channel:read:hype_train',
   'channel:read:goals',
+  'user:read:chat',
 ].join(' ');
 
 // ─── Token Store ────────────────────────────────────────────────────────────
@@ -193,6 +194,34 @@ function broadcastGoal() {
   const data = `data: ${JSON.stringify({ type: 'goal-update', goal: goalState })}
 
 `;
+  for (const client of sseClients) {
+    try { client.write(data); } catch (e) { sseClients.delete(client); }
+  }
+}
+
+// ─── Giveaway ───────────────────────────────────────────────────────────────
+const GIVEAWAY_FILE = path.join(__dirname, '.giveaway-state.json');
+
+let giveawayState = {
+  active:  false,      // accepting new entries via chat keyword
+  keyword: '!enter',
+  entries: [],          // [{ userId, username }]
+  winner:  null,         // { userId, username } | null
+};
+
+function loadGiveawayState() {
+  if (fs.existsSync(GIVEAWAY_FILE)) {
+    try { giveawayState = { ...giveawayState, ...JSON.parse(fs.readFileSync(GIVEAWAY_FILE, 'utf8')) }; }
+    catch (e) { console.log('[giveaway] Could not load giveaway state'); }
+  }
+}
+
+function saveGiveawayState() {
+  fs.writeFileSync(GIVEAWAY_FILE, JSON.stringify(giveawayState, null, 2));
+}
+
+function broadcastGiveaway(payload) {
+  const data = `data: ${JSON.stringify({ type: 'giveaway', ...payload })}\n\n`;
   for (const client of sseClients) {
     try { client.write(data); } catch (e) { sseClients.delete(client); }
   }
@@ -375,6 +404,7 @@ function eventsubSubscriptions(sessionId, broadcasterId) {
     { type: 'channel.goal.begin',          version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.goal.progress',       version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.goal.end',            version: '1', condition: { broadcaster_user_id: broadcasterId } },
+    { type: 'channel.chat.message',        version: '1', condition: { broadcaster_user_id: broadcasterId, user_id: broadcasterId } },
   ].map(sub => ({
     type:      sub.type,
     version:   sub.version,
@@ -634,6 +664,20 @@ function routeTwitchEvent(subType, event) {
       });
       console.log(`[twitch] Prediction: ${subType} — "${event.title}"`);
       break;
+
+    case 'channel.chat.message': {
+      if (!giveawayState.active) break;
+      const text = (event.message?.text || '').trim().toLowerCase();
+      if (text !== giveawayState.keyword.toLowerCase()) break;
+      const userId   = event.chatter_user_id;
+      const username = event.chatter_user_name;
+      if (giveawayState.entries.some(e => e.userId === userId)) break; // one entry per viewer
+      giveawayState.entries.push({ userId, username });
+      saveGiveawayState();
+      broadcastGiveaway({ status: 'active', keyword: giveawayState.keyword, count: giveawayState.entries.length });
+      console.log(`[giveaway] ${username} entered (${giveawayState.entries.length} total)`);
+      break;
+    }
   }
 }
 
@@ -1155,6 +1199,85 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /giveaway-state ─────────────────────────────────────
+  if (pathname === '/giveaway-state') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ...giveawayState, count: giveawayState.entries.length }));
+    return;
+  }
+
+  // ── POST /giveaway-start ────────────────────────────────────
+  if (pathname === '/giveaway-start' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { keyword } = JSON.parse(body || '{}');
+        giveawayState.active  = true;
+        giveawayState.keyword = (keyword && keyword.trim()) || '!enter';
+        giveawayState.entries = [];
+        giveawayState.winner  = null;
+        saveGiveawayState();
+        broadcastGiveaway({ status: 'started', keyword: giveawayState.keyword, count: 0 });
+        console.log(`[giveaway] Started — keyword: ${giveawayState.keyword}`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, giveaway: giveawayState }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── POST /giveaway-stop ─────────────────────────────────────
+  if (pathname === '/giveaway-stop' && req.method === 'POST') {
+    giveawayState.active = false;
+    saveGiveawayState();
+    broadcastGiveaway({ status: 'stopped', keyword: giveawayState.keyword, count: giveawayState.entries.length });
+    console.log(`[giveaway] Entries closed — ${giveawayState.entries.length} total`);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, giveaway: giveawayState }));
+    return;
+  }
+
+  // ── POST /giveaway-draw ─────────────────────────────────────
+  if (pathname === '/giveaway-draw' && req.method === 'POST') {
+    if (!giveawayState.entries.length) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'No entries to draw from' }));
+      return;
+    }
+    const winner = giveawayState.entries[Math.floor(Math.random() * giveawayState.entries.length)];
+    giveawayState.active = false;
+    giveawayState.winner = winner;
+    saveGiveawayState();
+    broadcastGiveaway({
+      status:  'drawing',
+      keyword: giveawayState.keyword,
+      count:   giveawayState.entries.length,
+      entries: giveawayState.entries.map(e => e.username),
+      winner:  winner.username,
+    });
+    console.log(`[giveaway] Winner drawn: ${winner.username} (from ${giveawayState.entries.length} entries)`);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, winner }));
+    return;
+  }
+
+  // ── POST /giveaway-reset ────────────────────────────────────
+  if (pathname === '/giveaway-reset' && req.method === 'POST') {
+    giveawayState.active  = false;
+    giveawayState.entries = [];
+    giveawayState.winner  = null;
+    saveGiveawayState();
+    broadcastGiveaway({ status: 'reset' });
+    console.log('[giveaway] Reset');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
   // ── Static files ───────────────────────────────────────────
   // Serve nom-alerts.html, config.js, Assets/, etc. from the same directory
   const MIME = {
@@ -1203,6 +1326,7 @@ loadGoalState();
 loadHealthSettings();
 loadThemeState();
 loadSocialConfig();
+loadGiveawayState();
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[nom-token-broker] Running on http://${SERVER_IP}:${PORT}`);
   if (tokenStore.refreshToken) {

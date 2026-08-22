@@ -525,6 +525,35 @@
     </div>
   </div>
 
+  <!-- ── Giveaway ── -->
+  <div class="panel full">
+    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Giveaway</span>
+      <span id="giveaway-status-badge" style="font-size:11px;font-style:italic;color:var(--dark-muted);">Idle</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;margin-bottom:12px;">
+      <div class="field" style="margin:0;">
+        <label>Entry Keyword</label>
+        <input id="giveaway-keyword-input" type="text" placeholder="!enter" />
+      </div>
+      <button onclick="startGiveaway()" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">▶</span> Start
+      </button>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <button onclick="stopGiveaway()" style="flex:1;padding:10px;">Close Entries</button>
+      <button onclick="drawGiveawayWinner()" style="flex:1;padding:10px;">🎉 Draw Winner</button>
+      <button onclick="resetGiveaway()" class="danger" style="flex:1;padding:10px;">↺ Reset</button>
+    </div>
+
+    <div class="token-row" style="justify-content:space-between;">
+      <span>Entries: <strong id="giveaway-entry-count">0</strong></span>
+      <span id="giveaway-winner-display" style="color:var(--amber);"></span>
+    </div>
+  </div>
+
   <!-- ── Event Log ── -->
   <div class="panel full">
     <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
@@ -1197,16 +1226,92 @@ async function fetchHealthStatus() {
   } catch (e) {}
 }
 
+// ─── Giveaway ─────────────────────────────────────────────────────────────────
+async function startGiveaway() {
+  const keyword = document.getElementById('giveaway-keyword-input').value.trim() || '!enter';
+  try {
+    const res = await fetch(`${OVERLAY_URL}/giveaway-start`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ keyword }),
+    });
+    if (res.ok) {
+      addLog(`Giveaway started — keyword: ${keyword}`, 'ok');
+      fetchGiveawayState();
+    } else {
+      addLog('Giveaway start failed', 'error');
+    }
+  } catch (e) {
+    addLog(`Giveaway start error: ${e.message}`, 'error');
+  }
+}
+
+async function stopGiveaway() {
+  try {
+    const res = await fetch(`${OVERLAY_URL}/giveaway-stop`, { method: 'POST' });
+    if (res.ok) {
+      addLog('Giveaway entries closed', 'ok');
+      fetchGiveawayState();
+    }
+  } catch (e) {
+    addLog(`Giveaway stop error: ${e.message}`, 'error');
+  }
+}
+
+async function drawGiveawayWinner() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/giveaway-draw`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      addLog(`Giveaway winner drawn: ${data.winner.username}`, 'ok');
+      fetchGiveawayState();
+    } else {
+      addLog(`Draw failed: ${data.error || 'no entries'}`, 'warn');
+    }
+  } catch (e) {
+    addLog(`Giveaway draw error: ${e.message}`, 'error');
+  }
+}
+
+async function resetGiveaway() {
+  if (!confirm('Reset the giveaway? This clears all entries and the winner.')) return;
+  try {
+    const res = await fetch(`${OVERLAY_URL}/giveaway-reset`, { method: 'POST' });
+    if (res.ok) {
+      addLog('Giveaway reset', 'ok');
+      fetchGiveawayState();
+    }
+  } catch (e) {
+    addLog(`Giveaway reset error: ${e.message}`, 'error');
+  }
+}
+
+async function fetchGiveawayState() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/giveaway-state`);
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('giveaway-entry-count').textContent    = data.count || 0;
+    document.getElementById('giveaway-keyword-input').placeholder  = data.keyword || '!enter';
+    document.getElementById('giveaway-status-badge').textContent   =
+      data.active ? 'Collecting entries' : (data.winner ? 'Drawn' : 'Idle');
+    document.getElementById('giveaway-winner-display').textContent =
+      data.winner ? `🏆 ${data.winner.username}` : '';
+  } catch (e) {}
+}
+
 // ─── Init ──────────────────────────────────────────────────────────────────
 sbConnect();
 checkStatus();
 fetchGoalState();
 fetchHealthStatus();
+fetchGiveawayState();
 updateGoalVisButtons();
 onGoalTypeChange();
 onRemoveTypeChange();
 setInterval(checkStatus, 60000);
 setInterval(fetchGoalState, 15000);
+setInterval(fetchGiveawayState, 10000);
 setTimeout(fetchThemeState, 100);
 setTimeout(fetchSocialConfig, 200);
 setTimeout(async function() {

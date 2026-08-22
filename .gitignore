@@ -8,6 +8,7 @@ node_modules/
 .theme.json
 .social-config.json
 .social-scroller-enabled.json
+.giveaway-state.json
 
 npm-debug.log*
 *.log
