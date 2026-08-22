@@ -398,9 +398,9 @@ function eventsubSubscriptions(sessionId, broadcasterId) {
     { type: 'channel.prediction.progress', version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.prediction.lock',   version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.prediction.end',    version: '1', condition: { broadcaster_user_id: broadcasterId } },
-    { type: 'channel.hype_train.begin',    version: '1', condition: { broadcaster_user_id: broadcasterId } },
-    { type: 'channel.hype_train.progress', version: '1', condition: { broadcaster_user_id: broadcasterId } },
-    { type: 'channel.hype_train.end',      version: '1', condition: { broadcaster_user_id: broadcasterId } },
+    { type: 'channel.hype_train.begin',    version: '2', condition: { broadcaster_user_id: broadcasterId } },
+    { type: 'channel.hype_train.progress', version: '2', condition: { broadcaster_user_id: broadcasterId } },
+    { type: 'channel.hype_train.end',      version: '2', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.goal.begin',          version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.goal.progress',       version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.goal.end',            version: '1', condition: { broadcaster_user_id: broadcasterId } },
@@ -723,6 +723,11 @@ function connectEventSub(customUrl) {
   console.log(`[eventsub] Connecting to ${wsUrl}`);
 
   if (eventSubWs) {
+    // Strip listeners first — otherwise terminate() fires this socket's own
+    // 'close' handler, which schedules a SECOND independent reconnect on top
+    // of the new connection we're about to open, and every subsequent close
+    // does the same, spiraling into a reconnect storm that gets us rate-limited.
+    eventSubWs.removeAllListeners();
     try { eventSubWs.terminate(); } catch (e) {}
   }
 
