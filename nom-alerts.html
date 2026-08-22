@@ -1878,6 +1878,15 @@ async function fireShoutout(username, profileUrl, game) {
   showAlert('shoutout', username, null, null);
 }
 
+async function fireRaidOut(username, viewers) {
+  const data = await fetchShoutoutData(username);
+  const game = data.game;
+  CONFIGS.raid_out.sub = () => (game && game !== 'Unknown')
+    ? `Now catching ${game} live!`
+    : 'Take the party to their tavern!';
+  showAlert('raid_out', username, viewers, null);
+}
+
 // ─── Sound Config ──────────────────────────────────────────────────────────────
 // Place audio files in your Assets/ folder and update the paths below.
 // Set to null to disable sound for that alert type.
@@ -2302,6 +2311,8 @@ function connectAlertBus() {
     }
     if (payload.type === 'shoutout') {
       fireShoutout(payload.username, payload.profileUrl || null, payload.game || null);
+    } else if (payload.type === 'raid_out') {
+      fireRaidOut(payload.username || 'Someone', payload.amount ?? null);
     } else if (payload.type) {
       // trackGoal=true only for real events coming from Twitch EventSub (not admin test fires)
       const isReal = payload._real === true;

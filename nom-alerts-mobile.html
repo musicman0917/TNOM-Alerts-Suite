@@ -1049,6 +1049,32 @@ async function fireShoutout(username, profileUrl, game) {
   console.log(`[shoutout: ${username} | game: ${game}]`);
 }
 
+async function fireRaidOut(username, viewers) {
+  if (!TWITCH_TOKEN) {
+    for (let i = 0; i < 6; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      if (TWITCH_TOKEN) break;
+    }
+  }
+  let game = null;
+  if (TWITCH_TOKEN) {
+    try {
+      const headers = { 'Client-ID': TWITCH_CLIENT_ID, 'Authorization': `Bearer ${TWITCH_TOKEN}` };
+      const uRes  = await fetch(`https://api.twitch.tv/helix/users?login=${encodeURIComponent(username)}`, { headers });
+      const uData = await uRes.json();
+      const user  = uData.data?.[0];
+      if (user) {
+        const cRes  = await fetch(`https://api.twitch.tv/helix/channels?broadcaster_id=${user.id}`, { headers });
+        const cData = await cRes.json();
+        game = cData.data?.[0]?.game_name || null;
+      }
+    } catch (e) { console.log(`[raid_out] API error: ${e.message}`); }
+  }
+  CONFIGS.raid_out.sub = () => game ? `Now catching ${game} live!` : 'Take the party to their tavern!';
+  showAlert('raid_out', username, viewers, null);
+  console.log(`[raid_out: ${username} | game: ${game}]`);
+}
+
 // ─── Stats Widget ─────────────────────────────────────────────────────────────
 const BROKER_BASE = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
   ? CONFIG.tokenBrokerUrl.replace('/token', '')
@@ -1313,6 +1339,8 @@ function connectAlertBus() {
     }
     if (payload.type === 'shoutout') {
       fireShoutout(payload.username, payload.profileUrl || null, payload.game || null);
+    } else if (payload.type === 'raid_out') {
+      fireRaidOut(payload.username || 'Someone', payload.amount ?? null);
     } else if (payload.type) {
       showAlert(payload.type, payload.username || 'Someone', payload.amount ?? null, payload.message ?? null, payload.goal ?? null);
     }
