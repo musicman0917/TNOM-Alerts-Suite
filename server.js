@@ -114,7 +114,7 @@ let socialConfig = [
   { enabled: true,  icon: '🐦', handle: '@NomusicNom',           label: 'Twitter' },
   { enabled: true,  icon: '▶️', handle: 'NeighborhoodofMusic',   label: 'YouTube' },
   { enabled: true,  icon: '🦋', handle: '@neighborhoodofmusic',  label: 'Bluesky' },
-  { enabled: true,  icon: '💬', handle: 'discord.gg/nom',        label: 'Discord' },
+  { enabled: true,  icon: '💬', handle: 'https://discord.gg/UUWNtJb3qr', label: 'Discord' },
 ];
 
 let socialScrollerEnabled = true;
