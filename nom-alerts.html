@@ -1341,9 +1341,10 @@ function renderPrediction(data) {
 }
 
 // ─── Giveaway ──────────────────────────────────────────────────────────────
-const GIVEAWAY_ROW_H   = 56;  // must match .gr-reel-item height in CSS
-const GIVEAWAY_BEFORE  = 24;  // filler rows spun through before the winner
-let   giveawayLandFn   = null; // current transitionend handler, so we can remove it on a new draw
+const GIVEAWAY_ROW_H     = 56;  // must match .gr-reel-item height in CSS
+const GIVEAWAY_BEFORE    = 24;  // filler rows spun through before the winner
+let   giveawayLandFn     = null; // current transitionend handler, so we can remove it on a new draw
+let   giveawayHideTimer  = null; // pending "hide the winner badge" timeout, cleared if a new giveaway starts first
 
 function renderGiveaway(data) {
   const widget    = document.getElementById('giveaway-widget');
@@ -1354,6 +1355,7 @@ function renderGiveaway(data) {
   const subEl     = document.getElementById('giveaway-reveal-sub');
 
   if (data.status === 'started' || data.status === 'active') {
+    clearTimeout(giveawayHideTimer);
     keywordEl.textContent = `Type ${data.keyword} to win!`;
     countEl.textContent   = `${data.count || 0} entered`;
     widget.classList.add('visible');
@@ -1361,11 +1363,13 @@ function renderGiveaway(data) {
   }
 
   if (data.status === 'stopped') {
+    clearTimeout(giveawayHideTimer);
     countEl.textContent = `${data.count || 0} entered — entries closed`;
     return;
   }
 
   if (data.status === 'drawing') {
+    clearTimeout(giveawayHideTimer);
     widget.classList.remove('visible');
     if (giveawayLandFn) reel.removeEventListener('transitionend', giveawayLandFn);
 
@@ -1411,11 +1415,17 @@ function renderGiveaway(data) {
       keywordEl.textContent = `🏆 Winner: ${data.winner}`;
       countEl.textContent   = 'Congrats!';
       widget.classList.add('visible');
+
+      // Sit on the winner badge a moment, then go back to normal.
+      giveawayHideTimer = setTimeout(() => {
+        widget.classList.remove('visible');
+      }, 8000);
     }, 12000);
     return;
   }
 
   if (data.status === 'reset') {
+    clearTimeout(giveawayHideTimer);
     if (giveawayLandFn) { reel.removeEventListener('transitionend', giveawayLandFn); giveawayLandFn = null; }
     widget.classList.remove('visible');
     reveal.classList.remove('visible');
