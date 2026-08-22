@@ -538,7 +538,7 @@ const THEME_OVERRIDES = {
     giftsub:      { icon:'🪄', action: (u,a)  => `${u} shared some gifts with the neighborhood!`, sub: (u,a) => `${a} membership${Number(a)>1?'s':''} gifted!`, color:'#9B59B6' },
     bits:         { icon:'⭐', action: (u,a)  => `${u} sent ${a} stars to the neighborhood!`,             color:'#FFD700' },
     raid:         { icon:'🏰', action: (u,a)  => `${u} led ${a} visitors to the neighborhood!`, sub: () => 'The neighborhood grows! 🏰',                     color:'#6C3483' },
-    raid_out:     { icon:'🏰', action: (u,a)  => `Bringing ${a} neighbors to visit ${u}!`,       sub: () => 'Off to spread the love! 🏰',                     color:'#6C3483' },
+    raid_out:     { icon:'🏰', action: (u)    => `Raiding ${u}!`,                                 sub: () => 'Off to spread the love! 🏰',                     color:'#6C3483' },
     tip:          { icon:'💫', action: (u,a)  => `${u} left a gift for the neighborhood!`,   sub: (u,a) => a ? `$${parseFloat(a).toFixed(2)} — thank you! ✨` : '', color:'#FFD700' },
     yt_subscriber:{ icon:'🎬', action: u      => `${u} joined the neighborhood on YouTube!`, sub: () => 'The neighborhood keeps growing! ✨',                color:'#8E44AD' },
     yt_superchat: { icon:'💬✨',action:(u,a)  => `${u} sent a message to the neighborhood!`,          color:'#6C3483' },
@@ -634,8 +634,8 @@ const CONFIGS = {
   },
   raid_out: {
     label:   'Outgoing Raid',
-    action:  (u,a) => `Raiding ${u}!`,
-    sub:     (u,a) => `Taking ${a||0} viewers to their tavern!`,
+    action:  (u)   => `Raiding ${u}!`,
+    sub:     ()    => 'Take the party to their tavern!',
     color:   '#E06830',
     iconUrl: () => 'Assets/raid.gif',
     dur:     7500,
@@ -862,7 +862,7 @@ function renderAlert({ type, username, amount, message, goal }) {
   const iconWrap = document.getElementById('icon-wrap');
   if (cfg.iconUrl) {
     const url       = cfg.iconUrl(amount);
-    const isProfile = type === 'shoutout' && url && !url.startsWith('Assets');
+    const isProfile = (type === 'shoutout' || type === 'raid_out') && url && !url.startsWith('Assets');
     iconWrap.innerHTML = url
       ? `<img src="${url}" class="${isProfile ? 'profile' : ''}" alt="${type}">`
       : cfg.icon || '♪';
@@ -1057,6 +1057,7 @@ async function fireRaidOut(username, viewers) {
     }
   }
   let game = null;
+  let profileUrl = null;
   if (TWITCH_TOKEN) {
     try {
       const headers = { 'Client-ID': TWITCH_CLIENT_ID, 'Authorization': `Bearer ${TWITCH_TOKEN}` };
@@ -1064,12 +1065,14 @@ async function fireRaidOut(username, viewers) {
       const uData = await uRes.json();
       const user  = uData.data?.[0];
       if (user) {
+        profileUrl = user.profile_image_url || null;
         const cRes  = await fetch(`https://api.twitch.tv/helix/channels?broadcaster_id=${user.id}`, { headers });
         const cData = await cRes.json();
         game = cData.data?.[0]?.game_name || null;
       }
     } catch (e) { console.log(`[raid_out] API error: ${e.message}`); }
   }
+  CONFIGS.raid_out.iconUrl = () => profileUrl || 'Assets/raid.gif';
   CONFIGS.raid_out.sub = () => game ? `Now catching ${game} live!` : 'Take the party to their tavern!';
   showAlert('raid_out', username, viewers, null);
   console.log(`[raid_out: ${username} | game: ${game}]`);

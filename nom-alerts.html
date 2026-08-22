@@ -1520,7 +1520,7 @@ const THEME_OVERRIDES = {
     },
     raid_out: {
       icon:   '🏰',
-      action: (u,a)  => `Bringing ${a} neighbors to visit ${u}!`,
+      action: ()     => 'Bringing friends along!',
       sub:    ()     => 'Off to spread the love! 🏰',
       color:  '#6C3483',
     },
@@ -1690,7 +1690,7 @@ const CONFIGS = {
     icon:    null,
     iconUrl: () => 'Assets/raid.gif',
     label:   'Outgoing Raid',
-    action:  (u,a) => `Raiding ${u} with ${a||10}!`,
+    action:  ()    => 'Raiding over now!',
     sub:     ()    => 'Take the party to their tavern!',
     color:   '#E06830',
     dur:     7000,
@@ -1881,6 +1881,7 @@ async function fireShoutout(username, profileUrl, game) {
 async function fireRaidOut(username, viewers) {
   const data = await fetchShoutoutData(username);
   const game = data.game;
+  CONFIGS.raid_out.iconUrl = () => data.profileUrl || 'Assets/raid.gif';
   CONFIGS.raid_out.sub = () => (game && game !== 'Unknown')
     ? `Now catching ${game} live!`
     : 'Take the party to their tavern!';
@@ -2018,7 +2019,7 @@ function renderAlert({ type, username, amount, message, goal }) {
   if (cfg.iconUrl) {
     const url = cfg.iconUrl(amount);
     if (url) {
-      const isProfile = type === 'shoutout';
+      const isProfile = (type === 'shoutout' || type === 'raid_out') && !url.startsWith('Assets');
       const style = isProfile
         ? 'width:48px;height:48px;object-fit:cover;border-radius:50%;border:2px solid var(--border);'
         : 'width:44px;height:44px;object-fit:contain;';
@@ -2079,8 +2080,8 @@ function renderAlert({ type, username, amount, message, goal }) {
   document.getElementById('sub').textContent = '';
 
   const subText = typeof cfg.sub === 'function' ? cfg.sub(username, amount) : cfg.sub;
-  // Show sub text only for shoutouts (game info) — action line covers other alerts
-  if (type === 'shoutout') {
+  // Show sub text for shoutouts and outgoing raids (game info) — action line covers other alerts
+  if (type === 'shoutout' || type === 'raid_out') {
     document.getElementById('sub').textContent = subText || '';
   } else {
     document.getElementById('sub').textContent = '';
