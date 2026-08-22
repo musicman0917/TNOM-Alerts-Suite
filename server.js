@@ -42,6 +42,7 @@ const SCOPES = [
   'channel:read:hype_train',
   'channel:read:goals',
   'user:read:chat',
+  'user:write:chat',
 ].join(' ');
 
 // ─── Token Store ────────────────────────────────────────────────────────────
@@ -225,6 +226,62 @@ function broadcastGiveaway(payload) {
   for (const client of sseClients) {
     try { client.write(data); } catch (e) { sseClients.delete(client); }
   }
+}
+
+// ─── Integrations (Discord webhook, etc.) ──────────────────────────────────
+const INTEGRATIONS_FILE = path.join(__dirname, '.integrations.json');
+let integrations = { discordWebhookUrl: '' };
+
+function loadIntegrations() {
+  if (fs.existsSync(INTEGRATIONS_FILE)) {
+    try { integrations = { ...integrations, ...JSON.parse(fs.readFileSync(INTEGRATIONS_FILE, 'utf8')) }; }
+    catch (e) { console.log('[integrations] Could not load integrations'); }
+  }
+}
+
+function saveIntegrations() {
+  fs.writeFileSync(INTEGRATIONS_FILE, JSON.stringify(integrations, null, 2));
+}
+
+function postDiscordWebhook(webhookUrl, payload) {
+  return new Promise((resolve) => {
+    let u;
+    try { u = new URL(webhookUrl); } catch (e) { console.log('[discord] Invalid webhook URL'); resolve(false); return; }
+    const data = JSON.stringify(payload);
+    const opts = {
+      hostname: u.hostname,
+      path:     u.pathname + u.search,
+      method:   'POST',
+      headers: {
+        'Content-Type':   'application/json',
+        'Content-Length': Buffer.byteLength(data),
+      },
+    };
+    const req = https.request(opts, res => {
+      res.on('data', () => {});
+      res.on('end', () => resolve(res.statusCode >= 200 && res.statusCode < 300));
+    });
+    req.on('error', (e) => { console.log(`[discord] Webhook error: ${e.message}`); resolve(false); });
+    req.write(data);
+    req.end();
+  });
+}
+
+async function announceGiveawayWinnerToDiscord(winner, keyword, count) {
+  if (!integrations.discordWebhookUrl) return;
+  const ok = await postDiscordWebhook(integrations.discordWebhookUrl, {
+    embeds: [{
+      title:       '🎉 Giveaway Winner',
+      description: `**${winner.username}**`,
+      color:       15844367,
+      fields: [
+        { name: 'Keyword', value: keyword,       inline: true },
+        { name: 'Entries', value: String(count), inline: true },
+      ],
+      timestamp: new Date().toISOString(),
+    }],
+  });
+  console.log(ok ? `[discord] Winner posted: ${winner.username}` : '[discord] Failed to post winner');
 }
 
 // ─── Health Settings ────────────────────────────────────────────────────────
@@ -455,6 +512,25 @@ function helixDelete(path, token) {
     req.on('error', reject);
     req.end();
   });
+}
+
+async function sendChatMessage(text) {
+  try {
+    const token = await getValidToken();
+    if (!token) { console.log('[chat] No token — cannot send message'); return; }
+    const res = await helixPost('/helix/chat/messages', token, {
+      broadcaster_id: BROADCASTER_ID,
+      sender_id:      BROADCASTER_ID,
+      message:        text,
+    });
+    if (res.status === 200 && res.body?.data?.[0]?.is_sent) {
+      console.log(`[chat] Sent: ${text}`);
+    } else {
+      console.log(`[chat] Send failed: ${JSON.stringify(res.body)}`);
+    }
+  } catch (e) {
+    console.log(`[chat] Send error: ${e.message}`);
+  }
 }
 
 async function deleteStaleSubscriptions(token) {
@@ -1224,6 +1300,7 @@ const server = http.createServer(async (req, res) => {
         giveawayState.winner  = null;
         saveGiveawayState();
         broadcastGiveaway({ status: 'started', keyword: giveawayState.keyword, count: 0 });
+        sendChatMessage(`🎉 Giveaway started! Type ${giveawayState.keyword} in chat to enter!`);
         console.log(`[giveaway] Started — keyword: ${giveawayState.keyword}`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, giveaway: giveawayState }));
@@ -1240,6 +1317,7 @@ const server = http.createServer(async (req, res) => {
     giveawayState.active = false;
     saveGiveawayState();
     broadcastGiveaway({ status: 'stopped', keyword: giveawayState.keyword, count: giveawayState.entries.length });
+    sendChatMessage(`🔒 Giveaway entries are closed! ${giveawayState.entries.length} entered — winner coming soon!`);
     console.log(`[giveaway] Entries closed — ${giveawayState.entries.length} total`);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, giveaway: giveawayState }));
@@ -1253,18 +1331,21 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: 'No entries to draw from' }));
       return;
     }
-    const winner = giveawayState.entries[Math.floor(Math.random() * giveawayState.entries.length)];
+    const winner     = giveawayState.entries[Math.floor(Math.random() * giveawayState.entries.length)];
+    const entryCount = giveawayState.entries.length;
     giveawayState.active = false;
     giveawayState.winner = winner;
     saveGiveawayState();
     broadcastGiveaway({
       status:  'drawing',
       keyword: giveawayState.keyword,
-      count:   giveawayState.entries.length,
+      count:   entryCount,
       entries: giveawayState.entries.map(e => e.username),
       winner:  winner.username,
     });
-    console.log(`[giveaway] Winner drawn: ${winner.username} (from ${giveawayState.entries.length} entries)`);
+    sendChatMessage(`🏆 The giveaway winner is @${winner.username}! Congratulations! 🎉`);
+    announceGiveawayWinnerToDiscord(winner, giveawayState.keyword, entryCount);
+    console.log(`[giveaway] Winner drawn: ${winner.username} (from ${entryCount} entries)`);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, winner }));
     return;
@@ -1280,6 +1361,33 @@ const server = http.createServer(async (req, res) => {
     console.log('[giveaway] Reset');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  // ── GET /discord-webhook-state ──────────────────────────────
+  if (pathname === '/discord-webhook-state') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ url: integrations.discordWebhookUrl || '' }));
+    return;
+  }
+
+  // ── POST /discord-webhook-set ───────────────────────────────
+  if (pathname === '/discord-webhook-set' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { url: webhookUrl } = JSON.parse(body || '{}');
+        integrations.discordWebhookUrl = (webhookUrl || '').trim();
+        saveIntegrations();
+        console.log(`[discord] Webhook ${integrations.discordWebhookUrl ? 'set' : 'cleared'}`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
     return;
   }
 
@@ -1332,6 +1440,7 @@ loadHealthSettings();
 loadThemeState();
 loadSocialConfig();
 loadGiveawayState();
+loadIntegrations();
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[nom-token-broker] Running on http://${SERVER_IP}:${PORT}`);
   if (tokenStore.refreshToken) {

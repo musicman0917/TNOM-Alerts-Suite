@@ -552,6 +552,18 @@
       <span>Entries: <strong id="giveaway-entry-count">0</strong></span>
       <span id="giveaway-winner-display" style="color:var(--amber);"></span>
     </div>
+
+    <hr>
+    <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--amber);margin-bottom:12px;">Discord Webhook (winner announcements)</div>
+    <div style="display:grid;grid-template-columns:3fr 1fr;gap:12px;align-items:end;">
+      <div class="field" style="margin:0;">
+        <label>Webhook URL</label>
+        <input id="discord-webhook-input" type="text" placeholder="https://discord.com/api/webhooks/..." />
+      </div>
+      <button onclick="saveDiscordWebhook()" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">💾</span> Save
+      </button>
+    </div>
   </div>
 
   <!-- ── Event Log ── -->
@@ -1300,12 +1312,40 @@ async function fetchGiveawayState() {
   } catch (e) {}
 }
 
+async function saveDiscordWebhook() {
+  const url = document.getElementById('discord-webhook-input').value.trim();
+  try {
+    const res = await fetch(`${OVERLAY_URL}/discord-webhook-set`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ url }),
+    });
+    if (res.ok) {
+      addLog(url ? 'Discord webhook saved' : 'Discord webhook cleared', 'ok');
+    } else {
+      addLog('Discord webhook save failed', 'error');
+    }
+  } catch (e) {
+    addLog(`Discord webhook error: ${e.message}`, 'error');
+  }
+}
+
+async function fetchDiscordWebhook() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/discord-webhook-state`);
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('discord-webhook-input').value = data.url || '';
+  } catch (e) {}
+}
+
 // ─── Init ──────────────────────────────────────────────────────────────────
 sbConnect();
 checkStatus();
 fetchGoalState();
 fetchHealthStatus();
 fetchGiveawayState();
+fetchDiscordWebhook();
 updateGoalVisButtons();
 onGoalTypeChange();
 onRemoveTypeChange();

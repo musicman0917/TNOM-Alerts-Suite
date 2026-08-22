@@ -9,6 +9,7 @@ node_modules/
 .social-config.json
 .social-scroller-enabled.json
 .giveaway-state.json
+.integrations.json
 
 npm-debug.log*
 *.log
