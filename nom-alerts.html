@@ -593,19 +593,54 @@
     font-size: 16px; letter-spacing: .18em; text-transform: uppercase;
     color: var(--amber); margin-bottom: 18px;
   }
-  .gr-name {
-    font-family: 'Cinzel', serif;
-    font-size: 44px; font-weight: 700;
-    color: var(--warm);
-    text-shadow: 0 0 20px var(--glow-rgba);
-    margin-bottom: 10px;
-    min-height: 56px;
+
+  /* Slot-machine reel: a 3-row window, middle row is the payline */
+  .gr-reel-window {
+    position: relative;
+    height: 168px; /* 3 × 56px rows — keep in sync with GIVEAWAY_ROW_H in JS */
+    overflow: hidden;
+    margin: 0 auto 14px;
+    border-top: 2px solid var(--border);
+    border-bottom: 2px solid var(--border);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 22%, black 78%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0%, black 22%, black 78%, transparent 100%);
   }
-  .gr-name.landed {
+  .gr-reel-window::before {
+    content: '';
+    position: absolute;
+    top: 56px; left: 0; right: 0; height: 56px;
+    border-top: 1px solid var(--amber);
+    border-bottom: 1px solid var(--amber);
+    box-shadow: 0 0 16px var(--glow-rgba) inset;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .gr-reel {
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    will-change: transform;
+  }
+  .gr-reel-item {
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 16px;
+    font-family: 'Cinzel', serif;
+    font-size: 30px; font-weight: 700;
+    color: var(--warm);
+    opacity: .5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .gr-reel-item.landed {
+    opacity: 1;
+    text-shadow: 0 0 20px var(--glow-rgba);
     animation: giveawayLand .6s cubic-bezier(.34,1.56,.64,1);
   }
   @keyframes giveawayLand {
-    0%   { transform: scale(1.3); }
+    0%   { transform: scale(1.25); }
     60%  { transform: scale(0.94); }
     100% { transform: scale(1); }
   }
@@ -928,7 +963,9 @@
 <!-- ── Giveaway Winner Reveal (takeover) ── -->
 <div id="giveaway-reveal">
   <div class="gr-title">🎉 Drawing a Winner 🎉</div>
-  <div class="gr-name" id="giveaway-reveal-name">&nbsp;</div>
+  <div class="gr-reel-window">
+    <div class="gr-reel" id="giveaway-reel"></div>
+  </div>
   <div class="gr-sub" id="giveaway-reveal-sub"></div>
 </div>
 
@@ -1304,14 +1341,16 @@ function renderPrediction(data) {
 }
 
 // ─── Giveaway ──────────────────────────────────────────────────────────────
-let giveawayShuffleInterval = null;
+const GIVEAWAY_ROW_H   = 56;  // must match .gr-reel-item height in CSS
+const GIVEAWAY_BEFORE  = 24;  // filler rows spun through before the winner
+let   giveawayLandFn   = null; // current transitionend handler, so we can remove it on a new draw
 
 function renderGiveaway(data) {
   const widget    = document.getElementById('giveaway-widget');
   const keywordEl = document.getElementById('giveaway-keyword');
   const countEl   = document.getElementById('giveaway-count');
   const reveal    = document.getElementById('giveaway-reveal');
-  const nameEl    = document.getElementById('giveaway-reveal-name');
+  const reel      = document.getElementById('giveaway-reel');
   const subEl     = document.getElementById('giveaway-reveal-sub');
 
   if (data.status === 'started' || data.status === 'active') {
@@ -1328,24 +1367,44 @@ function renderGiveaway(data) {
 
   if (data.status === 'drawing') {
     widget.classList.remove('visible');
-    clearInterval(giveawayShuffleInterval);
+    if (giveawayLandFn) reel.removeEventListener('transitionend', giveawayLandFn);
 
-    const entries = (data.entries && data.entries.length) ? data.entries : [data.winner];
-    subEl.textContent = `${data.count || entries.length} entries`;
-    nameEl.classList.remove('landed');
+    const pool = (data.entries && data.entries.length) ? data.entries : [data.winner];
+    subEl.textContent = `${data.count || pool.length} entries`;
+
+    // Build the reel strip: random fillers, then the winner, then one trailing
+    // filler so the window's bottom slot isn't empty once it lands.
+    const strip = [];
+    for (let i = 0; i < GIVEAWAY_BEFORE; i++) strip.push(pool[Math.floor(Math.random() * pool.length)]);
+    const winnerIndex = strip.length;
+    strip.push(data.winner);
+    strip.push(pool[Math.floor(Math.random() * pool.length)]);
+
+    reel.style.transition = 'none';
+    reel.style.transform   = 'translateY(0px)';
+    reel.innerHTML = strip.map(n => `<div class="gr-reel-item">${n}</div>`).join('');
+
     reveal.classList.add('visible');
 
-    giveawayShuffleInterval = setInterval(() => {
-      nameEl.textContent = entries[Math.floor(Math.random() * entries.length)];
-    }, 80);
+    // Force a reflow so the 'none' transition above actually applies before
+    // we re-enable it — otherwise the browser can coalesce both into one frame.
+    void reel.offsetHeight;
 
-    setTimeout(() => {
-      clearInterval(giveawayShuffleInterval);
-      nameEl.textContent = data.winner;
-      nameEl.classList.add('landed');
+    requestAnimationFrame(() => {
+      const landY = (winnerIndex - 1) * GIVEAWAY_ROW_H; // centers winnerIndex in the 3-row window
+      reel.style.transition = 'transform 3.2s cubic-bezier(0.1, 0.75, 0.15, 1)';
+      reel.style.transform  = `translateY(-${landY}px)`;
+    });
+
+    giveawayLandFn = () => {
+      reel.removeEventListener('transitionend', giveawayLandFn);
+      giveawayLandFn = null;
+      const rows = reel.querySelectorAll('.gr-reel-item');
+      if (rows[winnerIndex]) rows[winnerIndex].classList.add('landed');
       subEl.textContent = '🏆 Winner!';
       spawnNoteBurst(5);
-    }, 2200);
+    };
+    reel.addEventListener('transitionend', giveawayLandFn);
 
     setTimeout(() => {
       reveal.classList.remove('visible');
@@ -1357,7 +1416,7 @@ function renderGiveaway(data) {
   }
 
   if (data.status === 'reset') {
-    clearInterval(giveawayShuffleInterval);
+    if (giveawayLandFn) { reel.removeEventListener('transitionend', giveawayLandFn); giveawayLandFn = null; }
     widget.classList.remove('visible');
     reveal.classList.remove('visible');
     countEl.textContent = '0 entered';
