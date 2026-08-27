@@ -43,6 +43,7 @@ const SCOPES = [
   'channel:read:goals',
   'user:read:chat',
   'user:write:chat',
+  'channel:read:ads',
 ].join(' ');
 
 // ─── Token Store ────────────────────────────────────────────────────────────
@@ -307,6 +308,36 @@ function isGiveawayMod(event) {
   return (event.badges || []).some(b => b.set_id === 'moderator');
 }
 
+// ─── Ad Break Timer ─────────────────────────────────────────────────────────
+// Twitch has no "ad coming up" push event, so we poll Get Ad Schedule and let
+// the overlay compute its own live countdown from the timestamps we hand it.
+let adScheduleState = { nextAdAt: null, durationSeconds: null };
+
+function broadcastAdBreak(payload) {
+  const data = `data: ${JSON.stringify({ type: 'ad-break', ...payload })}\n\n`;
+  for (const client of sseClients) {
+    try { client.write(data); } catch (e) { sseClients.delete(client); }
+  }
+}
+
+async function pollAdSchedule() {
+  try {
+    const token = await getValidToken();
+    if (!token) return;
+    const res = await helixGet(`/helix/channels/ads?broadcaster_id=${BROADCASTER_ID}`, token);
+    if (res.status !== 200) return;
+    const d = res.body?.data?.[0];
+    if (!d) return;
+    adScheduleState = {
+      nextAdAt:        d.next_ad_at || null,
+      durationSeconds: d.duration   || null,
+    };
+    broadcastAdBreak({ status: 'scheduled', ...adScheduleState });
+  } catch (e) {
+    console.log(`[ads] Schedule poll error: ${e.message}`);
+  }
+}
+
 // ─── Integrations (Discord webhook, etc.) ──────────────────────────────────
 const INTEGRATIONS_FILE = path.join(__dirname, '.integrations.json');
 let integrations = { discordWebhookUrl: '' };
@@ -541,6 +572,7 @@ function eventsubSubscriptions(sessionId, broadcasterId) {
     { type: 'channel.goal.progress',       version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.goal.end',            version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.chat.message',        version: '1', condition: { broadcaster_user_id: broadcasterId, user_id: broadcasterId } },
+    { type: 'channel.ad_break.begin',      version: '1', condition: { broadcaster_user_id: broadcasterId } },
   ].map(sub => ({
     type:      sub.type,
     version:   sub.version,
@@ -862,6 +894,16 @@ function routeTwitchEvent(subType, event) {
       }
       break;
     }
+
+    case 'channel.ad_break.begin':
+      broadcastAdBreak({
+        status:          'started',
+        durationSeconds: event.duration_seconds,
+        startedAt:       event.started_at,
+        isAutomatic:     !!event.is_automatic,
+      });
+      console.log(`[ads] Ad break started — ${event.duration_seconds}s (${event.is_automatic ? 'auto' : 'manual'})`);
+      break;
   }
 }
 
@@ -1469,6 +1511,13 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /ad-schedule-state ──────────────────────────────────
+  if (pathname === '/ad-schedule-state') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(adScheduleState));
+    return;
+  }
+
   // ── Static files ───────────────────────────────────────────
   // Serve nom-alerts.html, config.js, Assets/, etc. from the same directory
   const MIME = {
@@ -1527,4 +1576,6 @@ server.listen(PORT, '0.0.0.0', () => {
   } else {
     console.log(`[nom-token-broker] Not authorized yet — visit http://localhost:${PORT}/auth on the server`);
   }
+  pollAdSchedule();
+  setInterval(pollAdSchedule, 60000);
 });

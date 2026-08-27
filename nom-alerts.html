@@ -650,6 +650,45 @@
     color: var(--muted);
   }
 
+  /* ─── Ad Break Timer ──────────────────────────────────── */
+  #ad-timer-widget {
+    position: fixed;
+    top: 30px; left: 50%;
+    transform: translateX(-50%);
+    min-width: 200px;
+    text-align: center;
+    background: linear-gradient(155deg, #2A1508, #180C04);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 18px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .4s, border-color .4s, box-shadow .4s;
+    box-shadow: 0 4px 24px rgba(0,0,0,.6);
+    z-index: 40;
+  }
+  #ad-timer-widget.visible { opacity: 1; }
+  #ad-timer-widget.running {
+    border-color: #E03020;
+    box-shadow: 0 0 20px rgba(224,48,32,.4), 0 4px 24px rgba(0,0,0,.6);
+  }
+
+  .at-label {
+    font-family: 'Cinzel', serif;
+    font-size: 10px; letter-spacing: .15em; text-transform: uppercase;
+    color: var(--amber); margin-bottom: 4px;
+    transition: color .4s;
+  }
+  #ad-timer-widget.running .at-label { color: #FF6B6B; }
+
+  .at-time {
+    font-family: 'Cinzel', serif;
+    font-size: 26px; font-weight: 700;
+    color: var(--warm);
+    transition: color .4s;
+  }
+  #ad-timer-widget.running .at-time { color: #FF8080; }
+
   /* ─── Music Notes ───────────────────────────────────── */
   .music-note {
     position: fixed;
@@ -951,6 +990,12 @@
     <span class="pw-status" id="pred-status"></span>
     <span id="pred-timer"></span>
   </div>
+</div>
+
+<!-- ── Ad Break Timer ── -->
+<div id="ad-timer-widget">
+  <div class="at-label" id="ad-timer-label">📺 Ad Starting In</div>
+  <div class="at-time" id="ad-timer-time">2:00</div>
 </div>
 
 <!-- ── Giveaway Widget (persistent, collecting entries) ── -->
@@ -1338,6 +1383,71 @@ function renderPrediction(data) {
 
   widget.classList.add('visible');
   updateWidgetStacking();
+}
+
+// ─── Ad Break Timer ──────────────────────────────────────────────────────────
+// Twitch only pushes an event when an ad break actually starts — there's no
+// "coming up" push notification — so the server polls the ad schedule and
+// hands us next_ad_at; we compute the live countdown ourselves from that.
+let adNextAt      = null; // Date | null — next scheduled ad
+let adDuration    = null; // seconds | null
+let adStartedAt   = null; // Date | null — set once an ad break is actually running
+let adTickStarted = false;
+
+function formatMMSS(totalSeconds) {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function renderAdBreak(data) {
+  if (data.status === 'scheduled') {
+    adNextAt   = data.nextAdAt ? new Date(data.nextAdAt) : null;
+    adDuration = data.durationSeconds || null;
+  } else if (data.status === 'started') {
+    adStartedAt = data.startedAt ? new Date(data.startedAt) : new Date();
+    adDuration  = data.durationSeconds || null;
+    adNextAt    = null; // it's happening now, not "upcoming" anymore
+  }
+  if (!adTickStarted) {
+    adTickStarted = true;
+    setInterval(updateAdTimerDisplay, 500);
+  }
+  updateAdTimerDisplay();
+}
+
+function updateAdTimerDisplay() {
+  const widget  = document.getElementById('ad-timer-widget');
+  const labelEl = document.getElementById('ad-timer-label');
+  const timeEl  = document.getElementById('ad-timer-time');
+  const now     = Date.now();
+
+  // Currently running an ad break?
+  if (adStartedAt && adDuration) {
+    const remaining = adDuration - (now - adStartedAt.getTime()) / 1000;
+    if (remaining > 0) {
+      labelEl.textContent = '📺 Ad Break Ends In';
+      timeEl.textContent  = formatMMSS(remaining);
+      widget.classList.add('visible', 'running');
+      return;
+    }
+    adStartedAt = null;
+    adDuration  = null;
+  }
+
+  // Upcoming ad within the next 2 minutes?
+  if (adNextAt) {
+    const secsUntil = (adNextAt.getTime() - now) / 1000;
+    if (secsUntil > 0 && secsUntil <= 120) {
+      labelEl.textContent = '📺 Ad Starting In';
+      timeEl.textContent  = formatMMSS(secsUntil);
+      widget.classList.remove('running');
+      widget.classList.add('visible');
+      return;
+    }
+  }
+
+  widget.classList.remove('visible', 'running');
 }
 
 // ─── Giveaway ──────────────────────────────────────────────────────────────
@@ -2512,6 +2622,12 @@ function connectAlertBus() {
       return;
     }
 
+    // Ad break schedule / start
+    if (payload.type === 'ad-break') {
+      renderAdBreak(payload);
+      return;
+    }
+
     // Social config update
     if (payload.type === 'social-scroller-toggle') {
       const scroller = document.getElementById('social-scroller');
@@ -2803,6 +2919,19 @@ initSocialScrollerH();
     const data = await res.json();
     alertsPaused = !!data.paused;
     if (alertsPaused) console.log('[panic] Alerts loaded as PAUSED');
+  } catch(e) {}
+})();
+
+// Fetch the current ad schedule on load so a refreshed overlay doesn't have
+// to wait up to a minute for the next poll broadcast
+(async function checkAdSchedule() {
+  const base = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
+    ? CONFIG.tokenBrokerUrl.replace('/token', '')
+    : 'http://192.168.6.228:3010';
+  try {
+    const res  = await fetch(`${base}/ad-schedule-state`);
+    const data = await res.json();
+    renderAdBreak({ status: 'scheduled', nextAdAt: data.nextAdAt, durationSeconds: data.durationSeconds });
   } catch(e) {}
 })();
 </script>
