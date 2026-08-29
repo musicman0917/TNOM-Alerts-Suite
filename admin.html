@@ -566,6 +566,30 @@
     </div>
   </div>
 
+  <!-- ── Mod Timer ── -->
+  <div class="panel full">
+    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Mod Timer</span>
+      <span id="mod-timer-status-badge" style="font-size:11px;font-style:italic;color:var(--dark-muted);">Idle</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 2fr 1fr;gap:12px;align-items:end;margin-bottom:12px;">
+      <div class="field" style="margin:0;">
+        <label>Duration</label>
+        <input id="mod-timer-duration-input" type="text" placeholder="5m" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label>Label (optional)</label>
+        <input id="mod-timer-label-input" type="text" placeholder="Back after this boss fight!" />
+      </div>
+      <button onclick="startModTimer()" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">▶</span> Start
+      </button>
+    </div>
+
+    <button onclick="cancelModTimer()" class="danger" style="width:100%;padding:10px;">Cancel Timer</button>
+  </div>
+
   <!-- ── Event Log ── -->
   <div class="panel full">
     <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
@@ -1339,6 +1363,48 @@ async function fetchDiscordWebhook() {
   } catch (e) {}
 }
 
+async function startModTimer() {
+  const duration = document.getElementById('mod-timer-duration-input').value.trim();
+  const label    = document.getElementById('mod-timer-label-input').value.trim();
+  if (!duration) { addLog('Timer: enter a duration', 'warn'); return; }
+  try {
+    const res = await fetch(`${OVERLAY_URL}/mod-timer-set`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ duration, label }),
+    });
+    if (res.ok) {
+      addLog(`Timer started: ${duration}${label ? ` — ${label}` : ''}`, 'ok');
+      fetchModTimerState();
+    } else {
+      addLog('Timer failed — could not parse duration', 'error');
+    }
+  } catch (e) {
+    addLog(`Timer error: ${e.message}`, 'error');
+  }
+}
+
+async function cancelModTimer() {
+  try {
+    const res = await fetch(`${OVERLAY_URL}/mod-timer-cancel`, { method: 'POST' });
+    if (res.ok) {
+      addLog('Timer cancelled', 'ok');
+      fetchModTimerState();
+    }
+  } catch (e) {
+    addLog(`Timer cancel error: ${e.message}`, 'error');
+  }
+}
+
+async function fetchModTimerState() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/mod-timer-state`);
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('mod-timer-status-badge').textContent = data.active ? 'Running' : 'Idle';
+  } catch (e) {}
+}
+
 // ─── Init ──────────────────────────────────────────────────────────────────
 sbConnect();
 checkStatus();
@@ -1346,12 +1412,14 @@ fetchGoalState();
 fetchHealthStatus();
 fetchGiveawayState();
 fetchDiscordWebhook();
+fetchModTimerState();
 updateGoalVisButtons();
 onGoalTypeChange();
 onRemoveTypeChange();
 setInterval(checkStatus, 60000);
 setInterval(fetchGoalState, 15000);
 setInterval(fetchGiveawayState, 10000);
+setInterval(fetchModTimerState, 10000);
 setTimeout(fetchThemeState, 100);
 setTimeout(fetchSocialConfig, 200);
 setTimeout(async function() {

@@ -689,6 +689,35 @@
   }
   #ad-timer-widget.running .at-time { color: #FF8080; }
 
+  /* ─── Mod Timer ───────────────────────────────────────── */
+  #mod-timer-widget {
+    position: fixed;
+    bottom: 30px; right: 30px;
+    max-width: 280px;
+    text-align: center;
+    background: linear-gradient(155deg, #2A1508, #180C04);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 18px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .4s;
+    box-shadow: 0 4px 24px rgba(0,0,0,.6);
+    z-index: 40;
+  }
+  #mod-timer-widget.visible { opacity: 1; }
+
+  .mt-label {
+    font-family: 'Crimson Pro', serif;
+    font-size: 13px; font-style: italic;
+    color: var(--cream); margin-bottom: 4px;
+  }
+  .mt-time {
+    font-family: 'Cinzel', serif;
+    font-size: 26px; font-weight: 700;
+    color: var(--warm);
+  }
+
   /* ─── Music Notes ───────────────────────────────────── */
   .music-note {
     position: fixed;
@@ -996,6 +1025,12 @@
 <div id="ad-timer-widget">
   <div class="at-label" id="ad-timer-label">📺 Ad Starting In</div>
   <div class="at-time" id="ad-timer-time">2:00</div>
+</div>
+
+<!-- ── Mod Timer ── -->
+<div id="mod-timer-widget">
+  <div class="mt-label" id="mod-timer-label"></div>
+  <div class="mt-time" id="mod-timer-time">0:00</div>
 </div>
 
 <!-- ── Giveaway Widget (persistent, collecting entries) ── -->
@@ -1448,6 +1483,41 @@ function updateAdTimerDisplay() {
   }
 
   widget.classList.remove('visible', 'running');
+}
+
+// ─── Mod Timer ─────────────────────────────────────────────────────────────
+let modTimerEndsAt      = null; // Date | null
+let modTimerTickStarted = false;
+
+function renderModTimer(data) {
+  if (data.status === 'started') {
+    modTimerEndsAt = data.endsAt ? new Date(data.endsAt) : null;
+    document.getElementById('mod-timer-label').textContent = data.label || '';
+  } else if (data.status === 'cancelled') {
+    modTimerEndsAt = null;
+  }
+  if (!modTimerTickStarted) {
+    modTimerTickStarted = true;
+    setInterval(updateModTimerDisplay, 500);
+  }
+  updateModTimerDisplay();
+}
+
+function updateModTimerDisplay() {
+  const widget = document.getElementById('mod-timer-widget');
+  const timeEl = document.getElementById('mod-timer-time');
+  if (!modTimerEndsAt) {
+    widget.classList.remove('visible');
+    return;
+  }
+  const remaining = (modTimerEndsAt.getTime() - Date.now()) / 1000;
+  if (remaining <= 0) {
+    modTimerEndsAt = null;
+    widget.classList.remove('visible');
+    return;
+  }
+  timeEl.textContent = formatMMSS(remaining);
+  widget.classList.add('visible');
 }
 
 // ─── Giveaway ──────────────────────────────────────────────────────────────
@@ -2628,6 +2698,12 @@ function connectAlertBus() {
       return;
     }
 
+    // Mod-set countdown timer
+    if (payload.type === 'mod-timer') {
+      renderModTimer(payload);
+      return;
+    }
+
     // Social config update
     if (payload.type === 'social-scroller-toggle') {
       const scroller = document.getElementById('social-scroller');
@@ -2932,6 +3008,18 @@ initSocialScrollerH();
     const res  = await fetch(`${base}/ad-schedule-state`);
     const data = await res.json();
     renderAdBreak({ status: 'scheduled', nextAdAt: data.nextAdAt, durationSeconds: data.durationSeconds });
+  } catch(e) {}
+})();
+
+// Fetch the current mod timer on load in case the overlay refreshed mid-countdown
+(async function checkModTimer() {
+  const base = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
+    ? CONFIG.tokenBrokerUrl.replace('/token', '')
+    : 'http://192.168.6.228:3010';
+  try {
+    const res  = await fetch(`${base}/mod-timer-state`);
+    const data = await res.json();
+    if (data.active) renderModTimer({ status: 'started', label: data.label, endsAt: data.endsAt });
   } catch(e) {}
 })();
 </script>

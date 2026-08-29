@@ -10,6 +10,7 @@ node_modules/
 .social-scroller-enabled.json
 .giveaway-state.json
 .integrations.json
+.mod-timer-state.json
 
 npm-debug.log*
 *.log

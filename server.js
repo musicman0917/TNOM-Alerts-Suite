@@ -301,11 +301,83 @@ function giveawayRemoveEntrant(username) {
   return removed;
 }
 
-// A chatter counts as a giveaway moderator if they're the broadcaster or
-// carry the moderator badge on this message.
-function isGiveawayMod(event) {
+// A chatter counts as a mod for chat-command purposes if they're the
+// broadcaster or carry the moderator badge on this message. Shared by the
+// !giveaway and !timer command handlers.
+function isChatMod(event) {
   if (event.chatter_user_id === BROADCASTER_ID) return true;
   return (event.badges || []).some(b => b.set_id === 'moderator');
+}
+
+// ─── Mod Timer ──────────────────────────────────────────────────────────────
+// A general-purpose countdown mods/broadcaster can set from chat or the
+// admin panel — "back in 5 minutes", "raffle closes in 90s", etc.
+const MOD_TIMER_FILE = path.join(__dirname, '.mod-timer-state.json');
+let modTimerState = { active: false, label: '', endsAt: null, durationSeconds: null };
+
+function loadModTimerState() {
+  if (fs.existsSync(MOD_TIMER_FILE)) {
+    try { modTimerState = { ...modTimerState, ...JSON.parse(fs.readFileSync(MOD_TIMER_FILE, 'utf8')) }; }
+    catch (e) { console.log('[timer] Could not load timer state'); }
+  }
+}
+
+function saveModTimerState() {
+  fs.writeFileSync(MOD_TIMER_FILE, JSON.stringify(modTimerState, null, 2));
+}
+
+function broadcastModTimer(payload) {
+  const data = `data: ${JSON.stringify({ type: 'mod-timer', ...payload })}\n\n`;
+  for (const client of sseClients) {
+    try { client.write(data); } catch (e) { sseClients.delete(client); }
+  }
+}
+
+// Accepts "5m", "1h30m", "90s", "2:30", "1:30:00", or a plain number of seconds.
+function parseDurationToSeconds(input) {
+  if (!input) return null;
+  const str = String(input).trim().toLowerCase();
+  if (/^\d+$/.test(str)) return parseInt(str, 10);
+  if (/^\d+:\d{1,2}(:\d{1,2})?$/.test(str)) {
+    const parts = str.split(':').map(Number);
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  const re = /(\d+)\s*(h|m|s)/g;
+  let match, total = 0, found = false;
+  while ((match = re.exec(str))) {
+    found = true;
+    const n = parseInt(match[1], 10);
+    if (match[2] === 'h') total += n * 3600;
+    else if (match[2] === 'm') total += n * 60;
+    else total += n;
+  }
+  return found ? total : null;
+}
+
+function modTimerStart(durationSeconds, label) {
+  const seconds = Math.max(1, Math.round(durationSeconds));
+  const endsAt  = new Date(Date.now() + seconds * 1000).toISOString();
+  modTimerState = { active: true, label: (label || '').trim(), endsAt, durationSeconds: seconds };
+  saveModTimerState();
+  broadcastModTimer({ status: 'started', label: modTimerState.label, endsAt, durationSeconds: seconds });
+  console.log(`[timer] Started — ${seconds}s${modTimerState.label ? ` "${modTimerState.label}"` : ''}`);
+}
+
+// Parses a raw duration string (from chat or the admin form) and starts the
+// timer. Returns false if the duration couldn't be parsed.
+function modTimerSetFromInput(durationStr, label) {
+  const seconds = parseDurationToSeconds(durationStr);
+  if (!seconds || seconds <= 0) return false;
+  modTimerStart(seconds, label);
+  return true;
+}
+
+function modTimerCancel() {
+  modTimerState = { active: false, label: '', endsAt: null, durationSeconds: null };
+  saveModTimerState();
+  broadcastModTimer({ status: 'cancelled' });
+  console.log('[timer] Cancelled');
 }
 
 // ─── Ad Break Timer ─────────────────────────────────────────────────────────
@@ -870,7 +942,7 @@ function routeTwitchEvent(subType, event) {
 
       // Mod/broadcaster commands: !giveaway start|stop|close|draw|reset|remove <user>
       if (text.startsWith('!giveaway ')) {
-        if (!isGiveawayMod(event)) {
+        if (!isChatMod(event)) {
           console.log(`[giveaway] Ignored !giveaway command from non-mod: ${event.chatter_user_name}`);
           break;
         }
@@ -890,6 +962,28 @@ function routeTwitchEvent(subType, event) {
           giveawayRemoveEntrant(arg);
         }
         console.log(`[giveaway] !giveaway ${action} by ${event.chatter_user_name}`);
+        break;
+      }
+
+      // Mod/broadcaster commands: !timer set <duration> [label] | !timer cancel
+      if (text.startsWith('!timer ')) {
+        if (!isChatMod(event)) {
+          console.log(`[timer] Ignored !timer command from non-mod: ${event.chatter_user_name}`);
+          break;
+        }
+        const parts  = rawText.slice('!timer '.length).trim().split(/\s+/);
+        const action = (parts[0] || '').toLowerCase();
+
+        if (action === 'set') {
+          const durationStr = parts[1] || '';
+          const label = parts.slice(2).join(' ');
+          if (!modTimerSetFromInput(durationStr, label)) {
+            sendChatMessage("Couldn't parse that duration — try something like !timer set 5m Back soon!");
+          }
+        } else if (action === 'cancel') {
+          modTimerCancel();
+        }
+        console.log(`[timer] !timer ${action} by ${event.chatter_user_name}`);
         break;
       }
       break;
@@ -1518,6 +1612,44 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /mod-timer-state ────────────────────────────────────
+  if (pathname === '/mod-timer-state') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(modTimerState));
+    return;
+  }
+
+  // ── POST /mod-timer-set ─────────────────────────────────────
+  if (pathname === '/mod-timer-set' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { duration, label } = JSON.parse(body || '{}');
+        const ok = modTimerSetFromInput(duration, label);
+        if (ok) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, timer: modTimerState }));
+        } else {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Could not parse duration' }));
+        }
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── POST /mod-timer-cancel ──────────────────────────────────
+  if (pathname === '/mod-timer-cancel' && req.method === 'POST') {
+    modTimerCancel();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
   // ── Static files ───────────────────────────────────────────
   // Serve nom-alerts.html, config.js, Assets/, etc. from the same directory
   const MIME = {
@@ -1568,6 +1700,7 @@ loadThemeState();
 loadSocialConfig();
 loadGiveawayState();
 loadIntegrations();
+loadModTimerState();
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[nom-token-broker] Running on http://${SERVER_IP}:${PORT}`);
   if (tokenStore.refreshToken) {
