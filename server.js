@@ -700,19 +700,19 @@ function helixDelete(path, token) {
 async function sendChatMessage(text) {
   try {
     const token = await getValidToken();
-    if (!token) { console.log('[chat] No token — cannot send message'); return; }
+    if (!token) { console.log('[chat] No token — cannot send message'); return false; }
     const res = await helixPost('/helix/chat/messages', token, {
       broadcaster_id: BROADCASTER_ID,
       sender_id:      BROADCASTER_ID,
       message:        text,
     });
-    if (res.status === 200 && res.body?.data?.[0]?.is_sent) {
-      console.log(`[chat] Sent: ${text}`);
-    } else {
-      console.log(`[chat] Send failed: ${JSON.stringify(res.body)}`);
-    }
+    const sent = res.status === 200 && !!res.body?.data?.[0]?.is_sent;
+    if (sent) console.log(`[chat] Sent: ${text}`);
+    else console.log(`[chat] Send failed: ${JSON.stringify(res.body)}`);
+    return sent;
   } catch (e) {
     console.log(`[chat] Send error: ${e.message}`);
+    return false;
   }
 }
 
@@ -1199,6 +1199,33 @@ const server = http.createServer(async (req, res) => {
         console.log(`[fire-alert] ${payload.type} — ${payload.username} (${sseClients.size} client(s))`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, clients: sseClients.size }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── POST /chat/announce ─────────────────────────────────────
+  // Generic relay so other local services (e.g. the charity donothon
+  // overlay on :3011) can post to chat through this broker's existing
+  // Twitch token, without needing their own OAuth setup. No formatting
+  // or game-specific logic — the message is sent exactly as given.
+  if (pathname === '/chat/announce' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { message } = JSON.parse(body || '{}');
+        if (!message || !String(message).trim()) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'message is required' }));
+          return;
+        }
+        const sent = await sendChatMessage(String(message));
+        res.writeHead(sent ? 200 : 502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: sent }));
       } catch (e) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: e.message }));
