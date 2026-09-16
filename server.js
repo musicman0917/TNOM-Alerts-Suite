@@ -151,6 +151,32 @@ function saveThemeState() {
   fs.writeFileSync(THEME_FILE, JSON.stringify(themeState, null, 2));
 }
 
+// ─── Stream Live Status ─────────────────────────────────────────────────────
+// In-memory only (not persisted) — reconciled against Twitch on every boot via
+// checkInitialStreamStatus() rather than trusting a stale value from before
+// a restart, then kept live by the stream.online/stream.offline EventSub subs.
+let streamLive = false;
+
+function broadcastStreamStatus() {
+  const data = `data: ${JSON.stringify({ type: 'stream-status', live: streamLive })}\n\n`;
+  for (const client of sseClients) {
+    try { client.write(data); } catch (e) { sseClients.delete(client); }
+  }
+}
+
+async function checkInitialStreamStatus() {
+  try {
+    const token = await getValidToken();
+    if (!token) return;
+    const res = await helixGet(`/helix/streams?user_id=${BROADCASTER_ID}`, token);
+    if (res.status !== 200) return;
+    streamLive = (res.body?.data || []).length > 0;
+    console.log(`[stream] Initial status: ${streamLive ? 'live' : 'offline'}`);
+  } catch (e) {
+    console.log(`[stream] Initial status check error: ${e.message}`);
+  }
+}
+
 let goalState = {
   bits:   0,
   subs:   0,
@@ -645,6 +671,8 @@ function eventsubSubscriptions(sessionId, broadcasterId) {
     { type: 'channel.goal.end',            version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.chat.message',        version: '1', condition: { broadcaster_user_id: broadcasterId, user_id: broadcasterId } },
     { type: 'channel.ad_break.begin',      version: '1', condition: { broadcaster_user_id: broadcasterId } },
+    { type: 'stream.online',               version: '1', condition: { broadcaster_user_id: broadcasterId } },
+    { type: 'stream.offline',              version: '1', condition: { broadcaster_user_id: broadcasterId } },
   ].map(sub => ({
     type:      sub.type,
     version:   sub.version,
@@ -998,6 +1026,18 @@ function routeTwitchEvent(subType, event) {
       });
       console.log(`[ads] Ad break started — ${event.duration_seconds}s (${event.is_automatic ? 'auto' : 'manual'})`);
       break;
+
+    case 'stream.online':
+      streamLive = true;
+      broadcastStreamStatus();
+      console.log(`[stream] Live (started at ${event.started_at})`);
+      break;
+
+    case 'stream.offline':
+      streamLive = false;
+      broadcastStreamStatus();
+      console.log('[stream] Offline');
+      break;
   }
 }
 
@@ -1349,6 +1389,13 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/theme-state') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(themeState));
+    return;
+  }
+
+  // ── GET /stream-status ─────────────────────────────────────
+  if (pathname === '/stream-status') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ live: streamLive }));
     return;
   }
 
@@ -1733,6 +1780,7 @@ server.listen(PORT, '0.0.0.0', () => {
   if (tokenStore.refreshToken) {
     scheduleRefresh();
     connectEventSub();
+    checkInitialStreamStatus();
   } else {
     console.log(`[nom-token-broker] Not authorized yet — visit http://localhost:${PORT}/auth on the server`);
   }
