@@ -60,6 +60,60 @@
     to   { opacity:1; transform:translateY(0)    scale(1)  rotate(0deg);  }
   }
 
+  /* ─── Halloween Theme ──────────────────────────────── */
+  body[data-theme="halloween"] {
+    --amber:      #FF7518;
+    --warm:       #FFA940;
+    --cream:      #F3E5D8;
+    --muted:      #C9A8E0;
+    --dark-muted: #8B6FA8;
+    --border:     #6A1B9A;
+    --glow-rgba:  rgba(255,117,24,.55);
+  }
+
+  body[data-theme="halloween"] .card {
+    background: linear-gradient(155deg, #1a0a20, #0a0510) !important;
+    border-color: #6A1B9A !important;
+    box-shadow: 0 0 30px rgba(255,117,24,.45), 0 8px 32px rgba(0,0,0,.8) !important;
+  }
+
+  body[data-theme="halloween"] .accent {
+    background: linear-gradient(90deg, #6A1B9A, #FF7518) !important;
+  }
+
+  body[data-theme="halloween"] #top-left-widgets {
+    border-color: rgba(255,117,24,.5) !important;
+    background: rgba(10,5,16,.88) !important;
+  }
+
+  body[data-theme="halloween"] .circle-fill {
+    stroke: #FF7518 !important;
+    filter: drop-shadow(0 0 8px rgba(255,117,24,.7)) !important;
+  }
+
+  body[data-theme="halloween"] .circle-track {
+    stroke: rgba(255,117,24,.2) !important;
+  }
+
+  body[data-theme="halloween"] .health-fill.steps {
+    background: linear-gradient(to right, #7A3D00, #FF7518) !important;
+  }
+
+  body[data-theme="halloween"] .health-fill.water {
+    background: linear-gradient(to right, #2D0A40, #6A1B9A) !important;
+  }
+
+  /* Halloween flicker animation on card */
+  body[data-theme="halloween"] .card.enter {
+    animation: halloweenCardIn .6s cubic-bezier(.34,1.52,.64,1) forwards !important;
+  }
+
+  @keyframes halloweenCardIn {
+    0%   { opacity:0;   transform:translateY(60px) scale(.9) rotate(1deg); }
+    60%  { opacity:.85; }
+    100% { opacity:1;   transform:translateY(0)    scale(1)  rotate(0deg);  }
+  }
+
   :root {
     --card-bg-a: #2A1508;
     --card-bg-b: #180C04;
@@ -440,6 +494,19 @@
   body[data-theme="disney"] .ht-top { color: #D4AAFF; }
   body[data-theme="disney"] .ht-footer { color: #FFD700; }
 
+  body[data-theme="halloween"] #hype-train-widget {
+    background: linear-gradient(155deg, #1a0a20, #0a0510);
+    border-color: #6A1B9A;
+    box-shadow: 0 0 20px rgba(255,117,24,.4), 0 4px 24px rgba(0,0,0,.6);
+  }
+  body[data-theme="halloween"] .ht-title { color: #FF7518; }
+  body[data-theme="halloween"] .ht-level { color: #FFA940; text-shadow: 0 0 16px rgba(255,117,24,.6); }
+  body[data-theme="halloween"] .ht-track { background: rgba(255,117,24,.15); }
+  body[data-theme="halloween"] .ht-fill  { background: linear-gradient(to right, #6A1B9A, #FF7518); }
+  body[data-theme="halloween"] .ht-points,
+  body[data-theme="halloween"] .ht-top { color: #C9A8E0; }
+  body[data-theme="halloween"] .ht-footer { color: #FF7518; }
+
   /* Level-based border/glow escalation */
   #hype-train-widget.ht-l2 { border-color: #FF8C00; box-shadow: 0 0 12px rgba(255,140,0,.3); }
   #hype-train-widget.ht-l3 { border-color: #FF4500; box-shadow: 0 0 20px rgba(255,69,0,.4); }
@@ -508,6 +575,20 @@
   body[data-theme="disney"] .ht-l4 .ht-footer { color: #FF66CC; }
   body[data-theme="disney"] .ht-l5 .ht-footer { color: #FFFFFF; }
   .ht-l5 .ht-fill { background: linear-gradient(to right, #BF00FF, #FF0080); }
+
+  body[data-theme="halloween"] .ht-l2 { border-color: #8B2FC9; box-shadow: 0 0 16px rgba(139,47,201,.4); }
+  body[data-theme="halloween"] .ht-l3 { border-color: #FF7518; box-shadow: 0 0 24px rgba(255,117,24,.5); }
+  body[data-theme="halloween"] .ht-l4 { border-color: #FF3D00; box-shadow: 0 0 32px rgba(255,61,0,.6); }
+  body[data-theme="halloween"] .ht-l5 { border-color: #E8F5E8; box-shadow: 0 0 44px rgba(232,245,232,.8); }
+  body[data-theme="halloween"] .ht-l2 .ht-title { color: #8B2FC9; }
+  body[data-theme="halloween"] .ht-l3 .ht-title { color: #FF7518; }
+  body[data-theme="halloween"] .ht-l4 .ht-title { color: #FF3D00; }
+  body[data-theme="halloween"] .ht-l5 .ht-title { color: #E8F5E8; }
+  body[data-theme="halloween"] .ht-l3 .ht-fill { background: linear-gradient(to right, #6A1B9A, #FF7518); }
+  body[data-theme="halloween"] .ht-l4 .ht-fill { background: linear-gradient(to right, #FF7518, #FF3D00); }
+  body[data-theme="halloween"] .ht-l5 .ht-fill { background: linear-gradient(to right, #FF3D00, #E8F5E8); }
+  body[data-theme="halloween"] .ht-l4 .ht-footer { color: #FF3D00; }
+  body[data-theme="halloween"] .ht-l5 .ht-footer { color: #E8F5E8; }
 
   .ht-points {
     font-family: 'Crimson Pro', serif;
@@ -829,6 +910,9 @@
   }
   body[data-theme="disney"] .channel-goal-fill {
     background: linear-gradient(to right, #9B59B6, #FFD700);
+  }
+  body[data-theme="halloween"] .channel-goal-fill {
+    background: linear-gradient(to right, #6A1B9A, #FF7518);
   }
 
   /* ─── Progress Circle ──────────────────────────────── */
@@ -1700,6 +1784,13 @@ const HT_MESSAGES = {
     4: '✨✨✨ THE WHOLE NEIGHBORHOOD IS HERE!',
     5: '🎆 LEGENDARY NEIGHBORHOOD ENERGY!!',
   },
+  halloween: {
+    1: '',
+    2: '🎃 The neighborhood is getting spooky!',
+    3: '🎃👻 The whole block is haunted!',
+    4: '👻💀 A FULL-ON MONSTER MASH!',
+    5: '⚰️🔥 LEGENDARY HAUNTED HYPE TRAIN!!',
+  },
 };
 
 const HT_TITLE_EMOJIS = {
@@ -1717,13 +1808,20 @@ const HT_TITLE_EMOJIS = {
     4: '🚂✨✨✨',
     5: '🚂🎆🎆🎆',
   },
+  halloween: {
+    1: '🚂',
+    2: '🚂🎃',
+    3: '🚂🎃👻',
+    4: '🚂👻👻',
+    5: '🚂💀💀💀',
+  },
 };
 
 function renderHypeTrain(data) {
   const widget = document.getElementById('hype-train-widget');
   const level  = data.level || 1;
   const pct    = data.goal > 0 ? Math.min((data.progress / data.goal) * 100, 100) : 0;
-  const themeKey = (typeof currentTheme !== 'undefined' && currentTheme === 'disney') ? 'disney' : 'tavern';
+  const themeKey = (typeof currentTheme !== 'undefined' && HT_MESSAGES[currentTheme]) ? currentTheme : 'tavern';
 
   // Apply level class
   widget.className = widget.className.replace(/ht-l\d/g, '').trim();
@@ -1979,6 +2077,101 @@ const THEME_OVERRIDES = {
       color:  '#9B59B6',
     },
   },
+  halloween: {
+    follow: {
+      icon:   '🎃',
+      action: u      => `${u} joined the haunted neighborhood!`,
+      sub:    ()     => 'Welcome to the haunt! 🎃',
+      color:  '#FF7518',
+    },
+    sub: {
+      icon:   '👻',
+      action: (u,a)  => `${u} became a spirit of the neighborhood!`,
+      sub:    (u,a)  => halloweenSubMsg(a),
+      color:  '#6A1B9A',
+    },
+    resub: {
+      icon:   '💀',
+      action: (u,a)  => `${u} has haunted the neighborhood for ${a} months!`,
+      sub:    ()     => 'The haunting continues! 👻',
+      color:  '#8B2FC9',
+    },
+    giftsub: {
+      icon:   '🦇',
+      action: (u,a)  => `${u} shared some tricks with the neighborhood!`,
+      sub:    (u,a)  => `${a} membership${Number(a)>1?'s':''} gifted!`,
+      color:  '#FF7518',
+    },
+    bits: {
+      icon:   '🕸️',
+      action: (u,a)  => `${u} sent ${a} spooky bits!`,
+      sub:    (u,a)  => bitsMsg(Number(a)||0),
+      color:  '#FFA940',
+    },
+    raid: {
+      icon:   '🏚️',
+      action: (u,a)  => `${u} led ${a} ghosts to the neighborhood!`,
+      sub:    ()     => 'The haunted house grows! Welcome, all! 🎃',
+      color:  '#6A1B9A',
+    },
+    raid_out: {
+      icon:   '🏚️',
+      action: ()     => 'Bringing ghouls along!',
+      sub:    ()     => 'Off to haunt elsewhere! 👻',
+      color:  '#6A1B9A',
+    },
+    tip: {
+      icon:   '🍬',
+      action: (u,a)  => `${u} left candy for the neighborhood!`,
+      sub:    (u,a)  => a ? `$${parseFloat(a).toFixed(2)} — trick or treat! 🍬` : '',
+      color:  '#FF7518',
+    },
+    shoutout: {
+      icon:   '🎃',
+      action: u      => `Go show some love to ${u}!!!`,
+      color:  '#FF7518',
+    },
+    yt_subscriber: {
+      icon:   '🎬',
+      action: u      => `${u} joined the haunted neighborhood on YouTube!`,
+      sub:    ()     => 'The haunting keeps growing! 👻',
+      color:  '#6A1B9A',
+    },
+    yt_superchat: {
+      icon:   '💬🎃',
+      action: (u,a)  => `${u} sent a spooky message to the neighborhood!`,
+      color:  '#8B2FC9',
+    },
+    yt_member: {
+      icon:   '👑💀',
+      action: u      => `${u} became a member!`,
+      sub:    ()     => 'A new spirit joins the neighborhood! 👻',
+      color:  '#FF7518',
+    },
+    yt_milestone: {
+      icon:   '🦴',
+      action: (u,a)  => `${u} — ${a||'milestone'} months haunting the neighborhood!`,
+      color:  '#FFA940',
+    },
+    yt_giftmember: {
+      icon:   '🎁🎃',
+      action: (u,a)  => `${u} gifted ${a||1} membership${Number(a)>1?'s':''}!`,
+      sub:    ()     => 'Spreading the spooky spirit! 👻',
+      color:  '#8B2FC9',
+    },
+    watch_streak: {
+      icon:   '🦇',
+      action: (u,a)  => `${u} — ${a} streams in a row!`,
+      sub:    (u,a)  => halloweenStreakMsg(Number(a)||0),
+      color:  '#FFA940',
+    },
+    daily_checkin: {
+      icon:   '🎤🎃',
+      action: u      => `${u} checked in for the soundcheck!`,
+      sub:    ()     => 'Welcome to the haunted neighborhood! 🎃',
+      color:  '#FF7518',
+    },
+  },
 };
 
 function disneySubMsg(tier) {
@@ -1995,6 +2188,22 @@ function disneyStreakMsg(n) {
   if (n >= 10)  return '✨ The neighborhood keeps calling them back!';
   if (n >= 5)   return '✨ Feeling right at home!';
   return '✨ Welcome to the neighborhood!';
+}
+
+function halloweenSubMsg(tier) {
+  const t = Number(tier);
+  if (t >= 3) return 'A true master of the haunted neighborhood! 💀👑';
+  if (t >= 2) return 'A devoted spirit of the neighborhood! 👻';
+  return 'A spirit of the neighborhood! 🎃';
+}
+
+function halloweenStreakMsg(n) {
+  if (n >= 100) return '💀 A true legend haunts these streets!';
+  if (n >= 50)  return '👻 Truly bound to the neighborhood!';
+  if (n >= 25)  return '🎃 Haunting the neighborhood, stream after stream!';
+  if (n >= 10)  return '🦇 The neighborhood keeps calling them back!';
+  if (n >= 5)   return '🕸️ Feeling right at home in the haunt!';
+  return '🎃 Welcome to the haunted neighborhood!';
 }
 
 // Store original configs for restoration

@@ -26,6 +26,25 @@
   body[data-theme="disney"] .accent {
     background: linear-gradient(90deg, #9B59B6, #FFD700) !important;
   }
+
+  /* ─── Halloween Theme ──────────────────────────────── */
+  body[data-theme="halloween"] {
+    --amber:      #FF7518;
+    --warm:       #FFA940;
+    --cream:      #F3E5D8;
+    --muted:      #C9A8E0;
+    --dark-muted: #8B6FA8;
+    --border:     #6A1B9A;
+    --glow-rgba:  rgba(255,117,24,.55);
+  }
+  body[data-theme="halloween"] .card {
+    background: linear-gradient(155deg, #1a0a20, #0a0510) !important;
+    border-color: #6A1B9A !important;
+    box-shadow: 0 0 30px rgba(255,117,24,.45), 0 8px 32px rgba(0,0,0,.8) !important;
+  }
+  body[data-theme="halloween"] .accent {
+    background: linear-gradient(90deg, #6A1B9A, #FF7518) !important;
+  }
   /* ─── Social Scroller ───────────────────────────────── */
   #social-scroller {
     position: fixed;
@@ -159,6 +178,14 @@
   body[data-theme="disney"] .sw-fill-v.steps { background: linear-gradient(to top, #4A0080, #9B59B6); }
   body[data-theme="disney"] .sw-fill-v.water { background: linear-gradient(to top, #1A0050, #7B2FBE); }
 
+  body[data-theme="halloween"] .sw-track-v {
+    border-color: rgba(255,117,24,.4);
+    background: rgba(255,117,24,.1);
+  }
+  body[data-theme="halloween"] .sw-fill-v.goal  { background: linear-gradient(to top, #6A1B9A, #FF7518); }
+  body[data-theme="halloween"] .sw-fill-v.steps { background: linear-gradient(to top, #7A3D00, #FF7518); }
+  body[data-theme="halloween"] .sw-fill-v.water { background: linear-gradient(to top, #2D0A40, #6A1B9A); }
+
   /* ─── Channel Goal Bar ──────────────────────────────── */
   .channel-goal-bar {
     margin: 8px 20px 0;
@@ -195,6 +222,9 @@
   body[data-theme="disney"] .channel-goal-fill {
     background: linear-gradient(to right, #9B59B6, #FFD700);
   }
+  body[data-theme="halloween"] .channel-goal-fill {
+    background: linear-gradient(to right, #6A1B9A, #FF7518);
+  }
 
   body[data-theme="disney"] .card.enter {
     animation: disneyCardIn .6s cubic-bezier(.34,1.52,.64,1) forwards !important;
@@ -202,6 +232,15 @@
   @keyframes disneyCardIn {
     from { opacity:0; transform:translateX(-60px) scale(.9) rotate(-1deg); }
     to   { opacity:1; transform:translateX(0)     scale(1)  rotate(0deg);  }
+  }
+
+  body[data-theme="halloween"] .card.enter {
+    animation: halloweenCardIn .6s cubic-bezier(.34,1.52,.64,1) forwards !important;
+  }
+  @keyframes halloweenCardIn {
+    0%   { opacity:0;   transform:translateX(-60px) scale(.9) rotate(1deg); }
+    60%  { opacity:.85; }
+    100% { opacity:1;   transform:translateX(0)     scale(1)  rotate(0deg);  }
   }
 
   :root {
@@ -548,6 +587,23 @@ const THEME_OVERRIDES = {
     watch_streak: { icon:'⭐', action: (u,a)  => `${u} — ${a} streams in a row!`,      sub: (u,a) => disneyStreakMsg(Number(a)||0),             color:'#FFD700' },
     daily_checkin:{ icon:'🎤✨',action: u     => `${u} checked in for the soundcheck!`,      sub: () => 'Welcome to the neighborhood! ✨',                   color:'#9B59B6' },
   },
+  halloween: {
+    follow:       { icon:'🎃', action: u      => `${u} joined the haunted neighborhood!`,       sub: () => 'Welcome to the haunt! 🎃',                       color:'#FF7518' },
+    sub:          { icon:'👻', action: (u,a)  => `${u} became a spirit of the neighborhood!`,   sub: (u,a) => halloweenSubMsg(a),                            color:'#6A1B9A' },
+    resub:        { icon:'💀', action: (u,a)  => `${u} has haunted the neighborhood for ${a} months!`, sub: () => 'The haunting continues! 👻',              color:'#8B2FC9' },
+    giftsub:      { icon:'🦇', action: (u,a)  => `${u} shared some tricks with the neighborhood!`, sub: (u,a) => `${a} membership${Number(a)>1?'s':''} gifted!`, color:'#FF7518' },
+    bits:         { icon:'🕸️', action: (u,a)  => `${u} sent ${a} spooky bits!`,                 color:'#FFA940' },
+    raid:         { icon:'🏚️', action: (u,a)  => `${u} led ${a} ghosts to the neighborhood!`,   sub: () => 'The haunted house grows! 🎃',                    color:'#6A1B9A' },
+    raid_out:     { icon:'🏚️', action: (u)    => `Raiding ${u}!`,                               sub: () => 'Off to haunt elsewhere! 👻',                     color:'#6A1B9A' },
+    tip:          { icon:'🍬', action: (u,a)  => `${u} left candy for the neighborhood!`,       sub: (u,a) => a ? `$${parseFloat(a).toFixed(2)} — trick or treat! 🍬` : '', color:'#FF7518' },
+    yt_subscriber:{ icon:'🎬', action: u      => `${u} joined the haunted neighborhood on YouTube!`, sub: () => 'The haunting keeps growing! 👻',            color:'#6A1B9A' },
+    yt_superchat: { icon:'💬🎃',action:(u,a)  => `${u} sent a spooky message to the neighborhood!`, color:'#8B2FC9' },
+    yt_member:    { icon:'👑💀',action: u      => `${u} became a member!`,                       sub: () => 'A new spirit joins the neighborhood! 👻',        color:'#FF7518' },
+    yt_milestone: { icon:'🦴', action:(u,a)   => `${u} — ${a||'milestone'} months haunting the neighborhood!`, color:'#FFA940' },
+    yt_giftmember:{ icon:'🎁🎃',action:(u,a)  => `${u} gifted ${a||1} membership${Number(a)>1?'s':''}!`, sub: () => 'Spreading the spooky spirit! 👻',           color:'#8B2FC9' },
+    watch_streak: { icon:'🦇', action: (u,a)  => `${u} — ${a} streams in a row!`,       sub: (u,a) => halloweenStreakMsg(Number(a)||0),                     color:'#FFA940' },
+    daily_checkin:{ icon:'🎤🎃',action: u     => `${u} checked in for the soundcheck!`,      sub: () => 'Welcome to the haunted neighborhood! 🎃',            color:'#FF7518' },
+  },
 };
 
 function disneySubMsg(tier) {
@@ -557,6 +613,13 @@ function disneySubMsg(tier) {
   return 'A member of the neighborhood! ✨';
 }
 
+function halloweenSubMsg(tier) {
+  const t = Number(tier);
+  if (t >= 3) return 'A true master of the haunted neighborhood! 💀👑';
+  if (t >= 2) return 'A devoted spirit of the neighborhood! 👻';
+  return 'A spirit of the neighborhood! 🎃';
+}
+
 function disneyStreakMsg(n) {
   if (n >= 100) return '✨ A true neighborhood legend!';
   if (n >= 50)  return '✨ Truly part of the neighborhood!';
@@ -564,6 +627,15 @@ function disneyStreakMsg(n) {
   if (n >= 10)  return '✨ The neighborhood keeps calling them back!';
   if (n >= 5)   return '✨ Feeling right at home!';
   return '✨ Welcome to the neighborhood!';
+}
+
+function halloweenStreakMsg(n) {
+  if (n >= 100) return '💀 A true legend haunts these streets!';
+  if (n >= 50)  return '👻 Truly bound to the neighborhood!';
+  if (n >= 25)  return '🎃 Haunting the neighborhood, stream after stream!';
+  if (n >= 10)  return '🦇 The neighborhood keeps calling them back!';
+  if (n >= 5)   return '🕸️ Feeling right at home in the haunt!';
+  return '🎃 Welcome to the haunted neighborhood!';
 }
 
 let _baseConfigs = null;

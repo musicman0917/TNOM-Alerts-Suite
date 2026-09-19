@@ -244,6 +244,7 @@
       <select id="theme-select" onchange="switchTheme(this.value)" style="flex:1;padding:8px 12px;font-family:'Cinzel',serif;font-size:11px;letter-spacing:.1em;">
         <option value="tavern">🍺 Neighborhood Tavern (Default)</option>
         <option value="disney">✨ Disney Music Magic</option>
+        <option value="halloween">🎃 Haunted Neighborhood</option>
       </select>
       <span id="theme-status" style="font-family:'Crimson Pro',serif;font-size:13px;font-style:italic;color:var(--dark-muted);">—</span>
     </div>
@@ -962,6 +963,12 @@ async function saveSocialConfig() {
 }
 
 // ─── Theme Switcher ───────────────────────────────────────────────────────────
+const THEME_STATUS_LABELS = {
+  tavern:    '🍺 Tavern active',
+  disney:    '✨ Disney Magic active',
+  halloween: '🎃 Haunted Neighborhood active',
+};
+
 async function switchTheme(theme) {
   try {
     await fetch(`${OVERLAY_URL}/theme-set`, {
@@ -969,7 +976,7 @@ async function switchTheme(theme) {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ theme }),
     });
-    document.getElementById('theme-status').textContent = theme === 'disney' ? '✨ Disney Magic active' : '🍺 Tavern active';
+    document.getElementById('theme-status').textContent = THEME_STATUS_LABELS[theme] || THEME_STATUS_LABELS.tavern;
     addLog(`Theme switched to: ${theme}`, 'ok');
   } catch (e) {
     addLog(`Theme switch error: ${e.message}`, 'error');
@@ -981,8 +988,7 @@ async function fetchThemeState() {
     const res  = await fetch(`${OVERLAY_URL}/theme-state`);
     const data = await res.json();
     document.getElementById('theme-select').value = data.theme || 'tavern';
-    document.getElementById('theme-status').textContent =
-      data.theme === 'disney' ? '✨ Disney Magic active' : '🍺 Tavern active';
+    document.getElementById('theme-status').textContent = THEME_STATUS_LABELS[data.theme] || THEME_STATUS_LABELS.tavern;
   } catch (e) {}
 }
 
