@@ -27,6 +27,11 @@ const PORT           = parseInt(process.env.PORT)        || 3010;
 const SERVER_IP      = process.env.SERVER_IP             || '192.168.6.228';
 const TOKEN_FILE     = path.join(__dirname, '.twitch-token.json');
 
+// Fourthwall Open API — optional. If unset, Fourthwall polling just stays off
+// (donations still work via the Streamer.bot path until this is configured).
+const FOURTHWALL_USERNAME = process.env.FOURTHWALL_USERNAME || '';
+const FOURTHWALL_PASSWORD = process.env.FOURTHWALL_PASSWORD || '';
+
 if (!CLIENT_SECRET) {
   console.error('FATAL: TWITCH_CLIENT_SECRET is not set. Add it to your .env file or PM2 environment.');
   process.exit(1);
@@ -404,6 +409,177 @@ function modTimerCancel() {
   saveModTimerState();
   broadcastModTimer({ status: 'cancelled' });
   console.log('[timer] Cancelled');
+}
+
+// ─── Fourthwall (Direct API) ────────────────────────────────────────────────
+// Polls Fourthwall's Open API directly instead of relying on Streamer.bot's
+// relay for donations. No public URL needed (unlike Fourthwall's own
+// webhooks, which require one) — same poll-and-diff pattern as the ad
+// schedule. Exact field names for orders/memberships weren't fully
+// verifiable from docs at build time, so lookups are written defensively
+// with fallbacks, and every newly-seen item is logged in full so field
+// mappings can be corrected quickly from real data if needed.
+const FOURTHWALL_API_HOST = 'api.fourthwall.com';
+const FOURTHWALL_POLL_MS  = 30000;
+
+let fourthwallSeen = {
+  donations:   new Set(),
+  orders:      new Set(),
+  memberships: new Set(),
+};
+let fourthwallBootstrapped = {
+  donations:   false,
+  orders:      false,
+  memberships: false,
+};
+let fourthwallStatus = { enabled: false, connected: false, lastError: null, lastPollAt: null };
+let fourthwallTierNames = {}; // tierId -> tier name, refreshed periodically
+
+function fourthwallGet(path) {
+  return new Promise((resolve, reject) => {
+    const auth = Buffer.from(`${FOURTHWALL_USERNAME}:${FOURTHWALL_PASSWORD}`).toString('base64');
+    const opts = {
+      hostname: FOURTHWALL_API_HOST,
+      path,
+      method: 'GET',
+      headers: { 'Authorization': `Basic ${auth}` },
+    };
+    const req = https.request(opts, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+        catch (e) { resolve({ status: res.statusCode, body: data }); }
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+// Never show a raw email on stream — only a real display-name-shaped field,
+// otherwise a generic label.
+function fourthwallDisplayName(d) {
+  return d.username || d.customerName || d.displayName || d.supporterName ||
+         d.name || [d.firstName, d.lastName].filter(Boolean).join(' ') || null;
+}
+
+async function pollFourthwallDonations() {
+  try {
+    const res = await fourthwallGet('/open-api/v1.0/donations?page=0&size=10');
+    if (res.status !== 200) { fourthwallStatus.lastError = `donations ${res.status}`; return; }
+    fourthwallStatus.connected = true;
+    fourthwallStatus.lastError = null;
+    const items = res.body?.results || res.body?.donations || [];
+    for (const d of items.slice().reverse()) {
+      const id = d.id || d.donationId;
+      if (!id || fourthwallSeen.donations.has(id)) continue;
+      fourthwallSeen.donations.add(id);
+      if (!fourthwallBootstrapped.donations) continue; // don't replay history on boot
+      const username = fourthwallDisplayName(d) || 'A Kind Soul';
+      const amount   = d.amounts?.total?.value ?? d.amount?.value ?? d.amount ?? null;
+      const message  = d.message || null;
+      broadcastAlert({ type: 'tip', username, amount, message, _real: true });
+      console.log(`[fourthwall] Donation: ${username} — $${amount}`, JSON.stringify(d));
+    }
+    fourthwallBootstrapped.donations = true;
+  } catch (e) {
+    fourthwallStatus.lastError = e.message;
+    console.log(`[fourthwall] Donations poll error: ${e.message}`);
+  }
+}
+
+async function pollFourthwallOrders() {
+  try {
+    const res = await fourthwallGet('/open-api/v1.0/order?page=0&size=10');
+    if (res.status !== 200) { fourthwallStatus.lastError = `orders ${res.status}`; return; }
+    fourthwallStatus.connected = true;
+    fourthwallStatus.lastError = null;
+    const items = res.body?.results || res.body?.orders || [];
+    for (const o of items.slice().reverse()) {
+      const id = o.id || o.friendlyId;
+      if (!id || fourthwallSeen.orders.has(id)) continue;
+      fourthwallSeen.orders.add(id);
+      if (!fourthwallBootstrapped.orders) continue;
+      const username = fourthwallDisplayName(o) || 'A Generous Fan';
+      const amount   = o.total?.value ?? o.amount?.value ?? null;
+      const item     = o.items?.[0]?.name || o.lineItems?.[0]?.variant?.name || o.products?.[0]?.name || null;
+      broadcastAlert({
+        type:     'merch',
+        username,
+        amount,
+        message:  item,
+        _real:    true,
+      });
+      console.log(`[fourthwall] Order: ${username} — $${amount}`, JSON.stringify(o));
+    }
+    fourthwallBootstrapped.orders = true;
+  } catch (e) {
+    fourthwallStatus.lastError = e.message;
+    console.log(`[fourthwall] Orders poll error: ${e.message}`);
+  }
+}
+
+async function fourthwallRefreshTiers() {
+  try {
+    const res = await fourthwallGet('/open-api/v1.0/memberships/tiers');
+    if (res.status !== 200) return;
+    const tiers = res.body?.results || res.body?.tiers || [];
+    const map = {};
+    for (const t of tiers) if (t.id) map[t.id] = t.name || 'Member';
+    fourthwallTierNames = map;
+  } catch (e) {
+    console.log(`[fourthwall] Tier refresh error: ${e.message}`);
+  }
+}
+
+async function pollFourthwallMemberships() {
+  try {
+    const res = await fourthwallGet('/open-api/v1.0/memberships/members?page=0&size=10');
+    if (res.status !== 200) { fourthwallStatus.lastError = `memberships ${res.status}`; return; }
+    fourthwallStatus.connected = true;
+    fourthwallStatus.lastError = null;
+    const items = res.body?.results || res.body?.members || [];
+    for (const m of items.slice().reverse()) {
+      const id = m.id;
+      if (!id || fourthwallSeen.memberships.has(id)) continue;
+      fourthwallSeen.memberships.add(id);
+      if (!fourthwallBootstrapped.memberships) continue;
+      const username = fourthwallDisplayName(m) || 'A New Member';
+      const tierName = fourthwallTierNames[m.tierId] || 'Member';
+      broadcastAlert({
+        type:     'membership',
+        username,
+        amount:   null,
+        message:  tierName,
+        _real:    true,
+      });
+      console.log(`[fourthwall] New member: ${username} — ${tierName}`, JSON.stringify(m));
+    }
+    fourthwallBootstrapped.memberships = true;
+  } catch (e) {
+    fourthwallStatus.lastError = e.message;
+    console.log(`[fourthwall] Memberships poll error: ${e.message}`);
+  }
+}
+
+function startFourthwallPolling() {
+  if (!FOURTHWALL_USERNAME || !FOURTHWALL_PASSWORD) {
+    console.log('[fourthwall] No credentials set (FOURTHWALL_USERNAME/FOURTHWALL_PASSWORD) — polling disabled');
+    return;
+  }
+  fourthwallStatus.enabled = true;
+  console.log('[fourthwall] Polling enabled — donations, orders, memberships every 30s');
+  fourthwallRefreshTiers();
+  setInterval(fourthwallRefreshTiers, 5 * 60000);
+  const tick = () => {
+    fourthwallStatus.lastPollAt = new Date().toISOString();
+    pollFourthwallDonations();
+    pollFourthwallOrders();
+    pollFourthwallMemberships();
+  };
+  tick();
+  setInterval(tick, FOURTHWALL_POLL_MS);
 }
 
 // ─── Ad Break Timer ─────────────────────────────────────────────────────────
@@ -1686,6 +1862,13 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /fourthwall-status ──────────────────────────────────
+  if (pathname === '/fourthwall-status') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(fourthwallStatus));
+    return;
+  }
+
   // ── GET /mod-timer-state ────────────────────────────────────
   if (pathname === '/mod-timer-state') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1786,4 +1969,5 @@ server.listen(PORT, '0.0.0.0', () => {
   }
   pollAdSchedule();
   setInterval(pollAdSchedule, 60000);
+  startFourthwallPolling();
 });

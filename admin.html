@@ -296,6 +296,15 @@
     </div>
   </div>
 
+  <!-- ── Fourthwall Test Alerts ── -->
+  <div class="panel">
+    <div class="panel-title">Fire Test Alert — Fourthwall</div>
+    <div class="btn-grid">
+      <button onclick="test('merch')"><span class="icon">🛍️</span> Merch Order</button>
+      <button onclick="test('membership')"><span class="icon">👑</span> New Membership</button>
+    </div>
+  </div>
+
   <!-- ── Custom Alert ── -->
   <div class="panel">
     <div class="panel-title">Custom Alert</div>
@@ -317,6 +326,8 @@
         <option value="yt_member">🏅 YT New Member</option>
         <option value="yt_milestone">🎖 YT Milestone</option>
         <option value="yt_giftmember">🎁 YT Gift Member</option>
+        <option value="merch">🛍️ Merch Order</option>
+        <option value="membership">👑 New Membership</option>
       </select>
     </div>
     <div class="field">
@@ -362,6 +373,10 @@
     <div class="token-row">
       <span class="dot" id="overlay-dot">⚪</span>
       <span id="overlay-status">Overlay: <a href="http://192.168.6.228:3010/nom-alerts.html" target="_blank" style="color:var(--amber)">192.168.6.228:3010/nom-alerts.html</a></span>
+    </div>
+    <div class="token-row">
+      <span class="dot" id="fourthwall-dot">⚪</span>
+      <span id="fourthwall-status">Fourthwall: checking…</span>
     </div>
     <hr>
     <div class="btn-grid">
@@ -630,7 +645,6 @@ const SB_SUB = {
   id:      'nom-admin',
   events: {
     Twitch:     ['Follow','Cheer','Sub','ReSub','GiftSub','GiftBomb','Raid','ChatMessage'],
-    Fourthwall: ['Donation'],
   },
 };
 
@@ -698,6 +712,28 @@ async function checkStatus() {
   }
 }
 
+async function fetchFourthwallStatus() {
+  const dot = document.getElementById('fourthwall-dot');
+  const txt = document.getElementById('fourthwall-status');
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/fourthwall-status`);
+    const data = await res.json();
+    if (!data.enabled) {
+      dot.textContent = '⚪';
+      txt.textContent = 'Fourthwall: no credentials set';
+    } else if (data.connected && !data.lastError) {
+      dot.textContent = '🟢';
+      txt.textContent = `Fourthwall: connected${data.lastPollAt ? ` — last poll ${new Date(data.lastPollAt).toLocaleTimeString()}` : ''}`;
+    } else {
+      dot.textContent = '🔴';
+      txt.textContent = `Fourthwall: error — ${data.lastError || 'unknown'}`;
+    }
+  } catch (e) {
+    dot.textContent = '🔴';
+    txt.textContent = 'Fourthwall: could not reach broker';
+  }
+}
+
 // ─── Test helpers ──────────────────────────────────────────────────────────
 const TEST_DATA = {
   follow:   ['TestFollower',  null,    null],
@@ -715,6 +751,8 @@ const TEST_DATA = {
   yt_member:     ['YTMember',           null,  null],
   yt_milestone:  ['YTLoyalist',         6,     null],
   yt_giftmember: ['YTGifter',           3,     null],
+  merch:         ['MerchFan',           28.50, 'Neighborhood Hoodie'],
+  membership:    ['NewPatron',          null,  'Patron'],
 };
 
 function testWithGoal(type) {
@@ -1414,6 +1452,7 @@ async function fetchModTimerState() {
 // ─── Init ──────────────────────────────────────────────────────────────────
 sbConnect();
 checkStatus();
+fetchFourthwallStatus();
 fetchGoalState();
 fetchHealthStatus();
 fetchGiveawayState();
@@ -1423,6 +1462,7 @@ updateGoalVisButtons();
 onGoalTypeChange();
 onRemoveTypeChange();
 setInterval(checkStatus, 60000);
+setInterval(fetchFourthwallStatus, 30000);
 setInterval(fetchGoalState, 15000);
 setInterval(fetchGiveawayState, 10000);
 setInterval(fetchModTimerState, 10000);

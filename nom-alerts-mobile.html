@@ -586,6 +586,8 @@ const THEME_OVERRIDES = {
     yt_giftmember:{ icon:'🎁✨',action:(u,a)  => `${u} gifted ${a||1} membership${Number(a)>1?'s':''}!`, sub: () => 'Spreading the love! ✨', color:'#7B2FBE' },
     watch_streak: { icon:'⭐', action: (u,a)  => `${u} — ${a} streams in a row!`,      sub: (u,a) => disneyStreakMsg(Number(a)||0),             color:'#FFD700' },
     daily_checkin:{ icon:'🎤✨',action: u     => `${u} checked in for the soundcheck!`,      sub: () => 'Welcome to the neighborhood! ✨',                   color:'#9B59B6' },
+    merch:        { icon:'🛍️', action: u      => `${u} shopped the neighborhood store!`,     sub: () => 'Thank you for the support! ✨',                     color:'#FFD700' },
+    membership:   { icon:'👑', action: u      => `${u} joined the neighborhood!`,             sub: () => 'A new member of the magic! ✨',                     color:'#9B59B6' },
   },
   halloween: {
     follow:       { icon:'🎃', action: u      => `${u} joined the haunted neighborhood!`,       sub: () => 'Welcome to the haunt! 🎃',                       color:'#FF7518' },
@@ -603,6 +605,8 @@ const THEME_OVERRIDES = {
     yt_giftmember:{ icon:'🎁🎃',action:(u,a)  => `${u} gifted ${a||1} membership${Number(a)>1?'s':''}!`, sub: () => 'Spreading the spooky spirit! 👻',           color:'#8B2FC9' },
     watch_streak: { icon:'🦇', action: (u,a)  => `${u} — ${a} streams in a row!`,       sub: (u,a) => halloweenStreakMsg(Number(a)||0),                     color:'#FFA940' },
     daily_checkin:{ icon:'🎤🎃',action: u     => `${u} checked in for the soundcheck!`,      sub: () => 'Welcome to the haunted neighborhood! 🎃',            color:'#FF7518' },
+    merch:        { icon:'🛍️', action: u      => `${u} raided the haunted store!`,           sub: () => 'Thank you for the support! 🎃',                     color:'#FF7518' },
+    membership:   { icon:'💀', action: u      => `${u} joined the haunted neighborhood!`,     sub: () => 'A new spirit joins the ranks! 👻',                  color:'#6A1B9A' },
   },
 };
 
@@ -743,6 +747,22 @@ const CONFIGS = {
     sub:     ()    => 'Welcome to the neighborhood!',
     color:   '#9B59B6',
     dur:     5500,
+  },
+  merch: {
+    icon:    '🛍️',
+    label:   'Merch Order',
+    action:  (u,a) => `${u} shopped the store${a ? ` — $${parseFloat(a).toFixed(2)}` : ''}!`,
+    sub:     ()    => 'Thank you for the support!',
+    color:   '#F0C060',
+    dur:     6000,
+  },
+  membership: {
+    icon:    '👑',
+    label:   'New Member',
+    action:  (u)   => `${u} became a member!`,
+    sub:     ()    => 'Welcome to the neighborhood!',
+    color:   '#A060E0',
+    dur:     6000,
   },
   yt_subscriber: {
     icon:    '▶',
@@ -1326,7 +1346,10 @@ function reloadSocialConfig(data) {
   }
 }
 
-// ─── Streamer.bot WebSocket (YouTube + Fourthwall) ───────────────────────────
+// ─── Streamer.bot WebSocket (YouTube + Twitch) ───────────────────────────
+// Fourthwall donations now come directly from server.js polling the
+// Fourthwall API — see the SSE 'tip' handling — so this only covers
+// YouTube and the remaining Twitch events Streamer.bot still relays.
 function connectStreamerBot() {
   const sbUrl = (typeof CONFIG !== 'undefined' && CONFIG.streamerbotUrl)
     ? CONFIG.streamerbotUrl : 'ws://127.0.0.1:8080';
@@ -1337,7 +1360,6 @@ function connectStreamerBot() {
       request: 'Subscribe',
       id: 'nom-mobile',
       events: {
-        Fourthwall: ['Donation'],
         Twitch:     ['TwitchWatchStreak','RewardRedemption'],
         YouTube:    ['NewSubscriber','SuperChat','SuperSticker','NewSponsor','MemberMileStone','MembershipGift','GiftMembershipReceived'],
       },
@@ -1350,13 +1372,6 @@ function connectStreamerBot() {
     const type = msg?.event?.type;
     const d    = msg?.data || {};
     if (!src || !type) return;
-
-    if (src === 'Fourthwall' && type === 'Donation') {
-      const name   = d.name || d.user?.name || 'Someone';
-      const amount = d.amount != null ? d.amount / 100 : d.total ?? 0;
-      showAlert('tip', name, amount, d.message || null);
-      return;
-    }
 
     if (src === 'Twitch' && type === 'RewardRedemption') {
       const rewardTitle = d.reward?.title || d.rewardTitle || '';

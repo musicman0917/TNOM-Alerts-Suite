@@ -2076,6 +2076,18 @@ const THEME_OVERRIDES = {
       sub:    ()     => 'Welcome to the neighborhood! ✨',
       color:  '#9B59B6',
     },
+    merch: {
+      icon:   '🛍️',
+      action: u      => `${u} shopped the neighborhood store!`,
+      sub:    ()     => 'Thank you for the support! ✨',
+      color:  '#FFD700',
+    },
+    membership: {
+      icon:   '👑',
+      action: u      => `${u} joined the neighborhood!`,
+      sub:    ()     => 'A new member of the magic! ✨',
+      color:  '#9B59B6',
+    },
   },
   halloween: {
     follow: {
@@ -2170,6 +2182,18 @@ const THEME_OVERRIDES = {
       action: u      => `${u} checked in for the soundcheck!`,
       sub:    ()     => 'Welcome to the haunted neighborhood! 🎃',
       color:  '#FF7518',
+    },
+    merch: {
+      icon:   '🛍️',
+      action: u      => `${u} raided the haunted store!`,
+      sub:    ()     => 'Thank you for the support! 🎃',
+      color:  '#FF7518',
+    },
+    membership: {
+      icon:   '💀',
+      action: u      => `${u} joined the haunted neighborhood!`,
+      sub:    ()     => 'A new spirit joins the ranks! 👻',
+      color:  '#6A1B9A',
     },
   },
 };
@@ -2388,6 +2412,22 @@ const CONFIGS = {
     sub:    ()    => 'Welcome to the neighborhood!',
     color:  '#9B59B6',
     dur:    5500,
+  },
+  merch: {
+    icon:   '🛍️',
+    label:  'Merch Order',
+    action: (u,a) => `${u} shopped the store${a ? ` — $${parseFloat(a).toFixed(2)}` : ''}!`,
+    sub:    ()    => 'Thank you for the support!',
+    color:  '#F0C060',
+    dur:    6000,
+  },
+  membership: {
+    icon:   '👑',
+    label:  'New Member',
+    action: (u)   => `${u} became a member!`,
+    sub:    ()    => 'Welcome to the neighborhood!',
+    color:  '#A060E0',
+    dur:    6000,
   },
 };
 
@@ -3004,12 +3044,14 @@ const SB_SUB_TWITCH = {
   },
 };
 
-const SB_SUB_FOURTHWALL = {
+// Fourthwall donations now come directly from server.js polling the
+// Fourthwall API — see the SSE 'tip' handling below — so this subscription
+// only covers YouTube events relayed through Streamer.bot.
+const SB_SUB_YOUTUBE = {
   request: 'Subscribe',
-  id:      'nom-alerts-fourthwall',
+  id:      'nom-alerts-youtube',
   events: {
-    Fourthwall: ['Donation'],
-    YouTube:    ['NewSubscriber','SuperChat','SuperSticker','NewSponsor','MemberMileStone','MembershipGift','GiftMembershipReceived'],
+    YouTube: ['NewSubscriber','SuperChat','SuperSticker','NewSponsor','MemberMileStone','MembershipGift','GiftMembershipReceived'],
   },
 };
 
@@ -3022,7 +3064,7 @@ function sbConnect() {
 
   ws.onopen = () => {
     ws.send(JSON.stringify(SB_SUB_TWITCH));
-    ws.send(JSON.stringify(SB_SUB_FOURTHWALL));
+    ws.send(JSON.stringify(SB_SUB_YOUTUBE));
     console.log(`[connected to streamerbot: ${SB_URL}]`);
     setStatus('connected');
     reconnectMs = 2000;
@@ -3043,16 +3085,6 @@ function sbConnect() {
     }
     if (msg.status === 'error' && msg.id?.startsWith('nom-alerts')) {
       console.log(`[subscription failed: ${msg.id} — ${JSON.stringify(msg)}]`);
-      return;
-    }
-
-    // ── Fourthwall ──────────────────────────────────────────
-    if (src === 'Fourthwall' && type === 'Donation') {
-      const name   = d.customerName || d.displayName || d.userName || 'A Kind Soul';
-      const amount = d.amount != null ? (d.amount / 100) : null;
-      const msg2   = d.message || null;
-      console.log(`[${name} tipped $${parseFloat(amount).toFixed(2)}]`);
-      showAlertWithGoal('tip', name, amount, msg2, true);
       return;
     }
 
