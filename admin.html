@@ -600,6 +600,16 @@
     </button>
 
     <hr>
+    <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--amber);margin:12px 0;">Channel Point Redemption</div>
+    <div class="field">
+      <label>Reward Name (must match the Twitch redemption exactly)</label>
+      <input id="wheel-redemption-name" type="text" placeholder="Wheel of Chaos" oninput="onWheelRedemptionNameChange()" />
+    </div>
+    <div style="font-family:'Crimson Pro',serif;font-size:12px;font-style:italic;color:var(--dark-muted);margin-bottom:4px;">
+      Redeeming this spins whichever category matches your live Twitch stream category below. The redemption is left unfulfilled for you to review/refund in the Twitch dashboard.
+    </div>
+
+    <hr>
     <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--amber);margin:12px 0;">Edit Category</div>
 
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:12px;">
@@ -615,6 +625,11 @@
         <label>Color</label>
         <input id="wheel-cat-color" type="color" style="height:38px;padding:2px;" oninput="onWheelCatFieldChange()" />
       </div>
+    </div>
+
+    <div class="field">
+      <label>Twitch Category (comma-separated — matches your live stream category to auto-switch here)</label>
+      <input id="wheel-cat-twitch" type="text" placeholder="Elden Ring, Dark Souls III" oninput="onWheelCatFieldChange()" />
     </div>
 
     <div class="field">
@@ -1420,9 +1435,10 @@ async function resetGiveaway() {
 }
 
 // ─── Wheel of Chaos ───────────────────────────────────────────────────────────
-let wheelCategories     = [];
-let wheelActiveCategory = '';
-let wheelEditingId      = '';
+let wheelCategories       = [];
+let wheelActiveCategory   = '';
+let wheelEditingId        = '';
+let wheelRedemptionName   = 'Wheel of Chaos';
 
 function renderWheelChips() {
   const container = document.getElementById('wheel-category-chips');
@@ -1447,9 +1463,10 @@ function loadWheelEditForm() {
   const cat = wheelCategories.find(c => c.id === wheelEditingId) || wheelCategories[0];
   if (!cat) return;
   wheelEditingId = cat.id;
-  document.getElementById('wheel-cat-label').value = cat.label || '';
-  document.getElementById('wheel-cat-emoji').value = cat.emoji || '';
-  document.getElementById('wheel-cat-color').value = cat.color || '#3AA0FF';
+  document.getElementById('wheel-cat-label').value  = cat.label || '';
+  document.getElementById('wheel-cat-emoji').value  = cat.emoji || '';
+  document.getElementById('wheel-cat-color').value  = cat.color || '#3AA0FF';
+  document.getElementById('wheel-cat-twitch').value = (cat.twitchCategories || []).join(', ');
   renderWheelOutcomeRows();
 }
 
@@ -1505,7 +1522,13 @@ function onWheelCatFieldChange() {
   cat.label = document.getElementById('wheel-cat-label').value;
   cat.emoji = document.getElementById('wheel-cat-emoji').value;
   cat.color = document.getElementById('wheel-cat-color').value;
+  cat.twitchCategories = document.getElementById('wheel-cat-twitch').value
+    .split(',').map(s => s.trim()).filter(Boolean);
   renderWheelChips();
+}
+
+function onWheelRedemptionNameChange() {
+  wheelRedemptionName = document.getElementById('wheel-redemption-name').value;
 }
 
 function addWheelCategory() {
@@ -1517,7 +1540,7 @@ function addWheelCategory() {
     addLog('A category with that name already exists', 'warn');
     return;
   }
-  wheelCategories.push({ id, label: label.trim(), emoji: '🎲', color: '#B87820', outcomes: [] });
+  wheelCategories.push({ id, label: label.trim(), emoji: '🎲', color: '#B87820', outcomes: [], twitchCategories: [] });
   wheelEditingId = id;
   renderWheelChips();
   loadWheelEditForm();
@@ -1539,12 +1562,17 @@ function deleteWheelCategory() {
 }
 
 async function saveWheelConfig() {
-  onWheelCatFieldChange(); // capture whatever's currently in the form
+  onWheelCatFieldChange();       // capture whatever's currently in the outcome/category form
+  onWheelRedemptionNameChange(); // capture the reward name field too
   try {
     const res = await fetch(`${OVERLAY_URL}/wheel-config`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ categories: wheelCategories, activeCategory: wheelActiveCategory }),
+      body:    JSON.stringify({
+        categories:          wheelCategories,
+        activeCategory:      wheelActiveCategory,
+        redemptionRewardName: wheelRedemptionName,
+      }),
     });
     if (res.ok) {
       addLog('Wheel of Chaos config saved ✓', 'ok');
@@ -1602,12 +1630,14 @@ async function fetchWheelState(syncForm) {
     const data = await res.json();
     wheelCategories     = (Array.isArray(data.categories) && data.categories.length) ? data.categories : wheelCategories;
     wheelActiveCategory = data.activeCategory || wheelActiveCategory;
+    wheelRedemptionName = data.redemptionRewardName || wheelRedemptionName;
     if (!wheelEditingId || !wheelCategories.some(c => c.id === wheelEditingId)) {
       wheelEditingId = wheelActiveCategory;
       syncForm = true;
     }
     renderWheelChips();
     if (syncForm) loadWheelEditForm();
+    document.getElementById('wheel-redemption-name').value = wheelRedemptionName;
     document.getElementById('wheel-last-result').textContent =
       data.lastResult ? `Last: ${data.lastResult.display}` : '';
   } catch (e) {}

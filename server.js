@@ -182,6 +182,22 @@ async function checkInitialStreamStatus() {
   }
 }
 
+// Syncs the Wheel of Chaos active category to whatever the channel is
+// already set to at boot — channel.update only fires on the next change,
+// so a restart mid-stream would otherwise miss the current category.
+async function checkInitialStreamCategory() {
+  try {
+    const token = await getValidToken();
+    if (!token) return;
+    const res = await helixGet(`/helix/channels?broadcaster_id=${BROADCASTER_ID}`, token);
+    if (res.status !== 200) return;
+    const category = res.body?.data?.[0]?.game_name;
+    if (category) wheelMatchTwitchCategory(category);
+  } catch (e) {
+    console.log(`[wheel] Initial category check error: ${e.message}`);
+  }
+}
+
 let goalState = {
   bits:   0,
   subs:   0,
@@ -339,11 +355,13 @@ const WHEEL_FILE = path.join(__dirname, '.wheel-state.json');
 
 let wheelState = {
   categories: [
-    { id: 'gaming', label: 'Gaming', emoji: '🎮', color: '#3AA0FF', outcomes: [] },
-    { id: 'irl',    label: 'IRL',    emoji: '🧍', color: '#FF7A3A', outcomes: [] },
+    { id: 'gaming', label: 'Gaming', emoji: '🎮', color: '#3AA0FF', outcomes: [], twitchCategories: [] },
+    { id: 'irl',    label: 'IRL',    emoji: '🧍', color: '#FF7A3A', outcomes: [], twitchCategories: [] },
   ],
   activeCategory: 'gaming',
   lastResult: null, // { category, display, chat, at }
+  // Twitch custom reward title that triggers a spin (exact match, case-insensitive).
+  redemptionRewardName: 'Wheel of Chaos',
 };
 
 // Each outcome has a short "display" shown spinning on the overlay wheel and
@@ -400,7 +418,7 @@ function wheelSetCategory(id) {
   return true;
 }
 
-function wheelSaveConfig(categories, activeCategory) {
+function wheelSaveConfig(categories, activeCategory, redemptionRewardName) {
   if (!Array.isArray(categories) || !categories.length) return false;
   wheelState.categories = categories.map(c => ({
     id:       String(c.id || c.label || 'category').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'category',
@@ -408,16 +426,37 @@ function wheelSaveConfig(categories, activeCategory) {
     emoji:    String(c.emoji || '🎲').slice(0, 8),
     color:    /^#[0-9a-f]{6}$/i.test(c.color || '') ? c.color : '#3AA0FF',
     outcomes: Array.isArray(c.outcomes) ? c.outcomes.map(normalizeWheelOutcome).filter(Boolean) : [],
+    twitchCategories: Array.isArray(c.twitchCategories)
+      ? c.twitchCategories.map(t => String(t).trim().slice(0, 60)).filter(Boolean).slice(0, 20)
+      : [],
   }));
   if (activeCategory && wheelState.categories.some(c => c.id === activeCategory)) {
     wheelState.activeCategory = activeCategory;
   } else if (!wheelState.categories.some(c => c.id === wheelState.activeCategory)) {
     wheelState.activeCategory = wheelState.categories[0].id;
   }
+  if (redemptionRewardName != null) {
+    wheelState.redemptionRewardName = String(redemptionRewardName).trim().slice(0, 60) || 'Wheel of Chaos';
+  }
   saveWheelState();
   broadcastWheel({ status: 'config', categories: wheelState.categories, activeCategory: wheelState.activeCategory });
   console.log('[wheel] Config saved');
   return true;
+}
+
+// Auto-switches the active category to whichever one lists this Twitch
+// stream category among its twitchCategories — called on boot (current
+// category) and on every channel.update event (category changes live).
+function wheelMatchTwitchCategory(twitchCategoryName) {
+  const name = (twitchCategoryName || '').trim().toLowerCase();
+  if (!name) return;
+  const match = wheelState.categories.find(c =>
+    (c.twitchCategories || []).some(tc => tc.toLowerCase() === name)
+  );
+  if (match && match.id !== wheelState.activeCategory) {
+    wheelSetCategory(match.id);
+    console.log(`[wheel] Twitch category "${twitchCategoryName}" -> wheel category "${match.label}"`);
+  }
 }
 
 function wheelSpin() {
@@ -957,6 +996,8 @@ function eventsubSubscriptions(sessionId, broadcasterId) {
     { type: 'channel.ad_break.begin',      version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'stream.online',               version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'stream.offline',              version: '1', condition: { broadcaster_user_id: broadcasterId } },
+    { type: 'channel.update',              version: '2', condition: { broadcaster_user_id: broadcasterId } },
+    { type: 'channel.channel_points_custom_reward_redemption.add', version: '1', condition: { broadcaster_user_id: broadcasterId } },
   ].map(sub => ({
     type:      sub.type,
     version:   sub.version,
@@ -1322,6 +1363,25 @@ function routeTwitchEvent(subType, event) {
       broadcastStreamStatus();
       console.log('[stream] Offline');
       break;
+
+    case 'channel.update':
+      wheelMatchTwitchCategory(event.category_name);
+      break;
+
+    case 'channel.channel_points_custom_reward_redemption.add': {
+      const rewardTitle = (event.reward?.title || '').trim().toLowerCase();
+      const target       = (wheelState.redemptionRewardName || '').trim().toLowerCase();
+      if (target && rewardTitle === target) {
+        const result = wheelSpin();
+        if (result) {
+          console.log(`[wheel] Redeemed by ${event.user_name}: ${result.display}`);
+        } else {
+          console.log(`[wheel] Redeemed by ${event.user_name}, but the active category has no outcomes`);
+          sendChatMessage(`@${event.user_name} redeemed Wheel of Chaos, but there's nothing on the wheel for this category yet — refund incoming!`);
+        }
+      }
+      break;
+    }
   }
 }
 
@@ -1971,8 +2031,8 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', () => {
       try {
-        const { categories, activeCategory } = JSON.parse(body || '{}');
-        if (!wheelSaveConfig(categories, activeCategory)) {
+        const { categories, activeCategory, redemptionRewardName } = JSON.parse(body || '{}');
+        if (!wheelSaveConfig(categories, activeCategory, redemptionRewardName)) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Invalid categories' }));
           return;
@@ -2137,6 +2197,7 @@ server.listen(PORT, '0.0.0.0', () => {
     scheduleRefresh();
     connectEventSub();
     checkInitialStreamStatus();
+    checkInitialStreamCategory();
   } else {
     console.log(`[nom-token-broker] Not authorized yet — visit http://localhost:${PORT}/auth on the server`);
   }
