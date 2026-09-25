@@ -1583,7 +1583,10 @@ async function spinWheel() {
     const data = await res.json();
     if (res.ok) {
       addLog(`🎡 Wheel spun (${data.result.label}): ${data.result.display} — chat: "${data.result.chat}"`, 'ok');
-      fetchWheelState();
+      // Update the last-result badge directly from the response instead of
+      // re-fetching /wheel-state, which would clobber any unsaved edits
+      // sitting in the outcome editor.
+      document.getElementById('wheel-last-result').textContent = `Last: ${data.result.display}`;
     } else {
       addLog(`Spin failed: ${data.error || 'no outcomes in this category'}`, 'warn');
     }
@@ -1711,7 +1714,6 @@ setInterval(fetchFourthwallStatus, 30000);
 setInterval(fetchGoalState, 15000);
 setInterval(fetchGiveawayState, 10000);
 setInterval(fetchModTimerState, 10000);
-setInterval(fetchWheelState, 15000);
 setTimeout(fetchThemeState, 100);
 setTimeout(fetchSocialConfig, 200);
 setTimeout(async function() {
