@@ -618,8 +618,14 @@
     </div>
 
     <div class="field">
-      <label>Outcomes (one per line)</label>
-      <textarea id="wheel-cat-outcomes" rows="6" placeholder="Play the next match with your character's name in an accent&#10;Handicap: one hand only for 5 minutes" oninput="onWheelCatFieldChange()"></textarea>
+      <label>Outcomes</label>
+      <div style="display:grid;grid-template-columns:1fr 2fr 28px;gap:6px;margin-bottom:6px;">
+        <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.1em;color:var(--dark-muted);">Wheel Display</span>
+        <span style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.1em;color:var(--dark-muted);">Chat Message</span>
+        <span></span>
+      </div>
+      <div id="wheel-outcome-rows" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+      <button onclick="addWheelOutcome()" type="button" style="width:100%;padding:8px;font-size:12px;">+ Add Outcome</button>
     </div>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
@@ -1441,10 +1447,51 @@ function loadWheelEditForm() {
   const cat = wheelCategories.find(c => c.id === wheelEditingId) || wheelCategories[0];
   if (!cat) return;
   wheelEditingId = cat.id;
-  document.getElementById('wheel-cat-label').value    = cat.label || '';
-  document.getElementById('wheel-cat-emoji').value    = cat.emoji || '';
-  document.getElementById('wheel-cat-color').value    = cat.color || '#3AA0FF';
-  document.getElementById('wheel-cat-outcomes').value = (cat.outcomes || []).join('\n');
+  document.getElementById('wheel-cat-label').value = cat.label || '';
+  document.getElementById('wheel-cat-emoji').value = cat.emoji || '';
+  document.getElementById('wheel-cat-color').value = cat.color || '#3AA0FF';
+  renderWheelOutcomeRows();
+}
+
+function renderWheelOutcomeRows() {
+  const cat       = wheelCategories.find(c => c.id === wheelEditingId);
+  const container = document.getElementById('wheel-outcome-rows');
+  container.innerHTML = '';
+  if (!cat) return;
+  (cat.outcomes || []).forEach((o, i) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 2fr 28px;gap:6px;align-items:center;';
+    row.innerHTML = `
+      <input type="text" value="${o.display || ''}" placeholder="Shows on the wheel"
+        oninput="updateWheelOutcome(${i}, 'display', this.value)"
+        style="padding:6px 8px;font-size:12px;">
+      <input type="text" value="${o.chat || ''}" placeholder="Posted to chat"
+        oninput="updateWheelOutcome(${i}, 'chat', this.value)"
+        style="padding:6px 8px;font-size:12px;">
+      <button onclick="removeWheelOutcome(${i})" style="padding:4px;font-size:10px;" class="danger">✕</button>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function updateWheelOutcome(i, field, value) {
+  const cat = wheelCategories.find(c => c.id === wheelEditingId);
+  if (!cat || !cat.outcomes[i]) return;
+  cat.outcomes[i][field] = value;
+}
+
+function addWheelOutcome() {
+  const cat = wheelCategories.find(c => c.id === wheelEditingId);
+  if (!cat) return;
+  cat.outcomes.push({ display: '', chat: '' });
+  renderWheelOutcomeRows();
+}
+
+function removeWheelOutcome(i) {
+  const cat = wheelCategories.find(c => c.id === wheelEditingId);
+  if (!cat) return;
+  cat.outcomes.splice(i, 1);
+  renderWheelOutcomeRows();
 }
 
 function editWheelCategory(id) {
@@ -1455,10 +1502,9 @@ function editWheelCategory(id) {
 function onWheelCatFieldChange() {
   const cat = wheelCategories.find(c => c.id === wheelEditingId);
   if (!cat) return;
-  cat.label    = document.getElementById('wheel-cat-label').value;
-  cat.emoji    = document.getElementById('wheel-cat-emoji').value;
-  cat.color    = document.getElementById('wheel-cat-color').value;
-  cat.outcomes = document.getElementById('wheel-cat-outcomes').value.split('\n').map(s => s.trim()).filter(Boolean);
+  cat.label = document.getElementById('wheel-cat-label').value;
+  cat.emoji = document.getElementById('wheel-cat-emoji').value;
+  cat.color = document.getElementById('wheel-cat-color').value;
   renderWheelChips();
 }
 
@@ -1536,7 +1582,7 @@ async function spinWheel() {
     const res  = await fetch(`${OVERLAY_URL}/wheel-spin`, { method: 'POST' });
     const data = await res.json();
     if (res.ok) {
-      addLog(`🎡 Wheel spun (${data.result.label}): ${data.result.outcome}`, 'ok');
+      addLog(`🎡 Wheel spun (${data.result.label}): ${data.result.display} — chat: "${data.result.chat}"`, 'ok');
       fetchWheelState();
     } else {
       addLog(`Spin failed: ${data.error || 'no outcomes in this category'}`, 'warn');
@@ -1560,7 +1606,7 @@ async function fetchWheelState(syncForm) {
     renderWheelChips();
     if (syncForm) loadWheelEditForm();
     document.getElementById('wheel-last-result').textContent =
-      data.lastResult ? `Last: ${data.lastResult.outcome}` : '';
+      data.lastResult ? `Last: ${data.lastResult.display}` : '';
   } catch (e) {}
 }
 

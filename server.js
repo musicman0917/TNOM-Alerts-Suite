@@ -343,12 +343,35 @@ let wheelState = {
     { id: 'irl',    label: 'IRL',    emoji: '🧍', color: '#FF7A3A', outcomes: [] },
   ],
   activeCategory: 'gaming',
-  lastResult: null, // { category, outcome, at }
+  lastResult: null, // { category, display, chat, at }
 };
+
+// Each outcome has a short "display" shown spinning on the overlay wheel and
+// a separate "chat" instruction posted to Twitch chat when it's drawn — a
+// wheel label like "British Accent" vs. the full "Speak in a British accent
+// for the next 10 minutes." Accepts legacy plain-string outcomes too.
+function normalizeWheelOutcome(o) {
+  if (typeof o === 'string') {
+    const display = o.slice(0, 60);
+    return display ? { display, chat: o.slice(0, 300) } : null;
+  }
+  if (o && typeof o === 'object') {
+    const display = String(o.display || '').slice(0, 60);
+    if (!display) return null;
+    return { display, chat: String(o.chat != null ? o.chat : display).slice(0, 300) };
+  }
+  return null;
+}
 
 function loadWheelState() {
   if (fs.existsSync(WHEEL_FILE)) {
-    try { wheelState = { ...wheelState, ...JSON.parse(fs.readFileSync(WHEEL_FILE, 'utf8')) }; }
+    try {
+      wheelState = { ...wheelState, ...JSON.parse(fs.readFileSync(WHEEL_FILE, 'utf8')) };
+      wheelState.categories = (wheelState.categories || []).map(c => ({
+        ...c,
+        outcomes: (c.outcomes || []).map(normalizeWheelOutcome).filter(Boolean),
+      }));
+    }
     catch (e) { console.log('[wheel] Could not load wheel state'); }
   }
 }
@@ -384,7 +407,7 @@ function wheelSaveConfig(categories, activeCategory) {
     label:    String(c.label || 'Category').slice(0, 40),
     emoji:    String(c.emoji || '🎲').slice(0, 8),
     color:    /^#[0-9a-f]{6}$/i.test(c.color || '') ? c.color : '#3AA0FF',
-    outcomes: Array.isArray(c.outcomes) ? c.outcomes.map(o => String(o).slice(0, 200)).filter(Boolean) : [],
+    outcomes: Array.isArray(c.outcomes) ? c.outcomes.map(normalizeWheelOutcome).filter(Boolean) : [],
   }));
   if (activeCategory && wheelState.categories.some(c => c.id === activeCategory)) {
     wheelState.activeCategory = activeCategory;
@@ -401,7 +424,7 @@ function wheelSpin() {
   const cat = wheelActiveCategoryObj();
   if (!cat || !cat.outcomes.length) return null;
   const outcome = cat.outcomes[Math.floor(Math.random() * cat.outcomes.length)];
-  wheelState.lastResult = { category: cat.id, outcome, at: Date.now() };
+  wheelState.lastResult = { category: cat.id, display: outcome.display, chat: outcome.chat, at: Date.now() };
   saveWheelState();
   broadcastWheel({
     status:   'spin',
@@ -409,12 +432,12 @@ function wheelSpin() {
     label:    cat.label,
     emoji:    cat.emoji,
     color:    cat.color,
-    outcomes: cat.outcomes,
-    result:   outcome,
+    outcomes: cat.outcomes.map(o => o.display), // reel fillers only need the short label
+    result:   outcome.display,
   });
-  sendChatMessage(`🎡 Wheel of Chaos (${cat.label}): ${outcome}`);
-  console.log(`[wheel] Spin (${cat.id}) -> ${outcome}`);
-  return { category: cat.id, label: cat.label, outcome };
+  sendChatMessage(`🎡 Wheel of Chaos (${cat.label}): ${outcome.chat}`);
+  console.log(`[wheel] Spin (${cat.id}) -> ${outcome.display}`);
+  return { category: cat.id, label: cat.label, display: outcome.display, chat: outcome.chat };
 }
 
 // A chatter counts as a mod for chat-command purposes if they're the
