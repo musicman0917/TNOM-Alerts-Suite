@@ -1445,7 +1445,7 @@ function connectAlertBus() {
       return;
     }
     // Mobile has no widgets for these — ignore so they don't fall through to a fake alert
-    if (payload.type === 'hype_train' || payload.type === 'poll' || payload.type === 'prediction' || payload.type === 'giveaway') {
+    if (payload.type === 'hype_train' || payload.type === 'poll' || payload.type === 'prediction' || payload.type === 'giveaway' || payload.type === 'wheel') {
       return;
     }
     // Panic button — pause/resume all alerts

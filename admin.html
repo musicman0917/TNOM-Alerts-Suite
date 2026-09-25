@@ -131,7 +131,7 @@
     color: var(--dark-muted);
     margin-bottom: 5px;
   }
-  .field input, .field select {
+  .field input, .field select, .field textarea {
     width: 100%;
     background: rgba(0,0,0,.4);
     border: 1px solid #B8782044;
@@ -143,7 +143,11 @@
     outline: none;
     transition: border-color .15s;
   }
-  .field input:focus, .field select:focus {
+  .field textarea {
+    resize: vertical;
+    line-height: 1.5;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
     border-color: var(--amber);
   }
   .field select option { background: #1E0E04; }
@@ -579,6 +583,49 @@
       <button onclick="saveDiscordWebhook()" style="height:38px;padding:0 16px;margin-bottom:0;">
         <span class="icon">💾</span> Save
       </button>
+    </div>
+  </div>
+
+  <!-- ── Wheel of Chaos ── -->
+  <div class="panel full">
+    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Wheel of Chaos</span>
+      <span id="wheel-last-result" style="font-size:11px;font-style:italic;color:var(--dark-muted);"></span>
+    </div>
+
+    <div id="wheel-category-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"></div>
+
+    <button onclick="spinWheel()" style="width:100%;padding:14px;margin-bottom:16px;font-size:14px;">
+      <span class="icon">🎡</span> SPIN
+    </button>
+
+    <hr>
+    <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--amber);margin:12px 0;">Edit Category</div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div class="field" style="margin:0;">
+        <label>Name</label>
+        <input id="wheel-cat-label" type="text" placeholder="Gaming" oninput="onWheelCatFieldChange()" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label>Emoji</label>
+        <input id="wheel-cat-emoji" type="text" placeholder="🎮" oninput="onWheelCatFieldChange()" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label>Color</label>
+        <input id="wheel-cat-color" type="color" style="height:38px;padding:2px;" oninput="onWheelCatFieldChange()" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Outcomes (one per line)</label>
+      <textarea id="wheel-cat-outcomes" rows="6" placeholder="Play the next match with your character's name in an accent&#10;Handicap: one hand only for 5 minutes" oninput="onWheelCatFieldChange()"></textarea>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+      <button onclick="addWheelCategory()" style="flex:1;padding:10px;">+ New Category</button>
+      <button onclick="deleteWheelCategory()" class="danger" style="flex:1;padding:10px;">✕ Delete Category</button>
+      <button onclick="saveWheelConfig()" style="flex:1;padding:10px;">💾 Save All</button>
     </div>
   </div>
 
@@ -1366,6 +1413,157 @@ async function resetGiveaway() {
   }
 }
 
+// ─── Wheel of Chaos ───────────────────────────────────────────────────────────
+let wheelCategories     = [];
+let wheelActiveCategory = '';
+let wheelEditingId      = '';
+
+function renderWheelChips() {
+  const container = document.getElementById('wheel-category-chips');
+  container.innerHTML = '';
+  wheelCategories.forEach(cat => {
+    const isActive = cat.id === wheelActiveCategory;
+    const chip = document.createElement('div');
+    chip.style.cssText = `display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:20px;` +
+      `border:1px solid ${isActive ? 'var(--amber)' : '#B8782044'};` +
+      `background:${isActive ? 'rgba(184,120,32,.15)' : 'rgba(0,0,0,.3)'};`;
+    chip.innerHTML = `
+      <span onclick="setWheelActiveCategory('${cat.id}')" style="cursor:pointer;font-family:'Crimson Pro',serif;font-size:13px;color:${isActive ? 'var(--amber)' : 'var(--cream)'};">
+        ${cat.emoji || '🎲'} ${cat.label}${isActive ? ' · LIVE' : ''}
+      </span>
+      <span onclick="editWheelCategory('${cat.id}')" title="Edit outcomes" style="cursor:pointer;font-size:11px;color:var(--dark-muted);">✎</span>
+    `;
+    container.appendChild(chip);
+  });
+}
+
+function loadWheelEditForm() {
+  const cat = wheelCategories.find(c => c.id === wheelEditingId) || wheelCategories[0];
+  if (!cat) return;
+  wheelEditingId = cat.id;
+  document.getElementById('wheel-cat-label').value    = cat.label || '';
+  document.getElementById('wheel-cat-emoji').value    = cat.emoji || '';
+  document.getElementById('wheel-cat-color').value    = cat.color || '#3AA0FF';
+  document.getElementById('wheel-cat-outcomes').value = (cat.outcomes || []).join('\n');
+}
+
+function editWheelCategory(id) {
+  wheelEditingId = id;
+  loadWheelEditForm();
+}
+
+function onWheelCatFieldChange() {
+  const cat = wheelCategories.find(c => c.id === wheelEditingId);
+  if (!cat) return;
+  cat.label    = document.getElementById('wheel-cat-label').value;
+  cat.emoji    = document.getElementById('wheel-cat-emoji').value;
+  cat.color    = document.getElementById('wheel-cat-color').value;
+  cat.outcomes = document.getElementById('wheel-cat-outcomes').value.split('\n').map(s => s.trim()).filter(Boolean);
+  renderWheelChips();
+}
+
+function addWheelCategory() {
+  const label = prompt('Category name:', '');
+  if (!label || !label.trim()) return;
+  let id = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  if (!id) id = `cat-${Date.now()}`;
+  if (wheelCategories.some(c => c.id === id)) {
+    addLog('A category with that name already exists', 'warn');
+    return;
+  }
+  wheelCategories.push({ id, label: label.trim(), emoji: '🎲', color: '#B87820', outcomes: [] });
+  wheelEditingId = id;
+  renderWheelChips();
+  loadWheelEditForm();
+}
+
+function deleteWheelCategory() {
+  if (wheelCategories.length <= 1) {
+    addLog('Keep at least one category', 'warn');
+    return;
+  }
+  const cat = wheelCategories.find(c => c.id === wheelEditingId);
+  if (!cat) return;
+  if (!confirm(`Delete category "${cat.label}"? This removes all its outcomes.`)) return;
+  wheelCategories = wheelCategories.filter(c => c.id !== cat.id);
+  if (wheelActiveCategory === cat.id) wheelActiveCategory = wheelCategories[0].id;
+  wheelEditingId = wheelCategories[0].id;
+  renderWheelChips();
+  loadWheelEditForm();
+}
+
+async function saveWheelConfig() {
+  onWheelCatFieldChange(); // capture whatever's currently in the form
+  try {
+    const res = await fetch(`${OVERLAY_URL}/wheel-config`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ categories: wheelCategories, activeCategory: wheelActiveCategory }),
+    });
+    if (res.ok) {
+      addLog('Wheel of Chaos config saved ✓', 'ok');
+      fetchWheelState(true);
+    } else {
+      addLog('Wheel config save failed', 'error');
+    }
+  } catch (e) {
+    addLog(`Wheel config save error: ${e.message}`, 'error');
+  }
+}
+
+async function setWheelActiveCategory(id) {
+  wheelActiveCategory = id;
+  renderWheelChips();
+  try {
+    const res = await fetch(`${OVERLAY_URL}/wheel-category`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ category: id }),
+    });
+    if (res.ok) {
+      const cat = wheelCategories.find(c => c.id === id);
+      addLog(`Wheel category set to ${cat ? cat.label : id}`, 'ok');
+    } else {
+      addLog('Wheel category switch failed', 'error');
+    }
+  } catch (e) {
+    addLog(`Wheel category error: ${e.message}`, 'error');
+  }
+}
+
+async function spinWheel() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/wheel-spin`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      addLog(`🎡 Wheel spun (${data.result.label}): ${data.result.outcome}`, 'ok');
+      fetchWheelState();
+    } else {
+      addLog(`Spin failed: ${data.error || 'no outcomes in this category'}`, 'warn');
+    }
+  } catch (e) {
+    addLog(`Wheel spin error: ${e.message}`, 'error');
+  }
+}
+
+async function fetchWheelState(syncForm) {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/wheel-state`);
+    if (!res.ok) return;
+    const data = await res.json();
+    wheelCategories     = (Array.isArray(data.categories) && data.categories.length) ? data.categories : wheelCategories;
+    wheelActiveCategory = data.activeCategory || wheelActiveCategory;
+    if (!wheelEditingId || !wheelCategories.some(c => c.id === wheelEditingId)) {
+      wheelEditingId = wheelActiveCategory;
+      syncForm = true;
+    }
+    renderWheelChips();
+    if (syncForm) loadWheelEditForm();
+    document.getElementById('wheel-last-result').textContent =
+      data.lastResult ? `Last: ${data.lastResult.outcome}` : '';
+  } catch (e) {}
+}
+
 async function fetchGiveawayState() {
   try {
     const res  = await fetch(`${OVERLAY_URL}/giveaway-state`);
@@ -1458,6 +1656,7 @@ fetchHealthStatus();
 fetchGiveawayState();
 fetchDiscordWebhook();
 fetchModTimerState();
+fetchWheelState(true);
 updateGoalVisButtons();
 onGoalTypeChange();
 onRemoveTypeChange();
@@ -1466,6 +1665,7 @@ setInterval(fetchFourthwallStatus, 30000);
 setInterval(fetchGoalState, 15000);
 setInterval(fetchGiveawayState, 10000);
 setInterval(fetchModTimerState, 10000);
+setInterval(fetchWheelState, 15000);
 setTimeout(fetchThemeState, 100);
 setTimeout(fetchSocialConfig, 200);
 setTimeout(async function() {

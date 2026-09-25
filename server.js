@@ -332,6 +332,91 @@ function giveawayRemoveEntrant(username) {
   return removed;
 }
 
+// ─── Wheel of Chaos ─────────────────────────────────────────────────────────
+// A category-scoped RNG spinner (e.g. "Gaming" vs "IRL") that picks one
+// outcome from the active category's list and announces it.
+const WHEEL_FILE = path.join(__dirname, '.wheel-state.json');
+
+let wheelState = {
+  categories: [
+    { id: 'gaming', label: 'Gaming', emoji: '🎮', color: '#3AA0FF', outcomes: [] },
+    { id: 'irl',    label: 'IRL',    emoji: '🧍', color: '#FF7A3A', outcomes: [] },
+  ],
+  activeCategory: 'gaming',
+  lastResult: null, // { category, outcome, at }
+};
+
+function loadWheelState() {
+  if (fs.existsSync(WHEEL_FILE)) {
+    try { wheelState = { ...wheelState, ...JSON.parse(fs.readFileSync(WHEEL_FILE, 'utf8')) }; }
+    catch (e) { console.log('[wheel] Could not load wheel state'); }
+  }
+}
+
+function saveWheelState() {
+  fs.writeFileSync(WHEEL_FILE, JSON.stringify(wheelState, null, 2));
+}
+
+function broadcastWheel(payload) {
+  const data = `data: ${JSON.stringify({ type: 'wheel', ...payload })}\n\n`;
+  for (const client of sseClients) {
+    try { client.write(data); } catch (e) { sseClients.delete(client); }
+  }
+}
+
+function wheelActiveCategoryObj() {
+  return wheelState.categories.find(c => c.id === wheelState.activeCategory) || wheelState.categories[0] || null;
+}
+
+function wheelSetCategory(id) {
+  if (!wheelState.categories.some(c => c.id === id)) return false;
+  wheelState.activeCategory = id;
+  saveWheelState();
+  broadcastWheel({ status: 'category', activeCategory: id });
+  console.log(`[wheel] Active category set to ${id}`);
+  return true;
+}
+
+function wheelSaveConfig(categories, activeCategory) {
+  if (!Array.isArray(categories) || !categories.length) return false;
+  wheelState.categories = categories.map(c => ({
+    id:       String(c.id || c.label || 'category').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'category',
+    label:    String(c.label || 'Category').slice(0, 40),
+    emoji:    String(c.emoji || '🎲').slice(0, 8),
+    color:    /^#[0-9a-f]{6}$/i.test(c.color || '') ? c.color : '#3AA0FF',
+    outcomes: Array.isArray(c.outcomes) ? c.outcomes.map(o => String(o).slice(0, 200)).filter(Boolean) : [],
+  }));
+  if (activeCategory && wheelState.categories.some(c => c.id === activeCategory)) {
+    wheelState.activeCategory = activeCategory;
+  } else if (!wheelState.categories.some(c => c.id === wheelState.activeCategory)) {
+    wheelState.activeCategory = wheelState.categories[0].id;
+  }
+  saveWheelState();
+  broadcastWheel({ status: 'config', categories: wheelState.categories, activeCategory: wheelState.activeCategory });
+  console.log('[wheel] Config saved');
+  return true;
+}
+
+function wheelSpin() {
+  const cat = wheelActiveCategoryObj();
+  if (!cat || !cat.outcomes.length) return null;
+  const outcome = cat.outcomes[Math.floor(Math.random() * cat.outcomes.length)];
+  wheelState.lastResult = { category: cat.id, outcome, at: Date.now() };
+  saveWheelState();
+  broadcastWheel({
+    status:   'spin',
+    category: cat.id,
+    label:    cat.label,
+    emoji:    cat.emoji,
+    color:    cat.color,
+    outcomes: cat.outcomes,
+    result:   outcome,
+  });
+  sendChatMessage(`🎡 Wheel of Chaos (${cat.label}): ${outcome}`);
+  console.log(`[wheel] Spin (${cat.id}) -> ${outcome}`);
+  return { category: cat.id, label: cat.label, outcome };
+}
+
 // A chatter counts as a mod for chat-command purposes if they're the
 // broadcaster or carry the moderator badge on this message. Shared by the
 // !giveaway and !timer command handlers.
@@ -1828,6 +1913,70 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /wheel-state ────────────────────────────────────────
+  if (pathname === '/wheel-state') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(wheelState));
+    return;
+  }
+
+  // ── POST /wheel-category ────────────────────────────────────
+  if (pathname === '/wheel-category' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { category } = JSON.parse(body || '{}');
+        if (!wheelSetCategory(category)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unknown category' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, wheel: wheelState }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── POST /wheel-config ──────────────────────────────────────
+  if (pathname === '/wheel-config' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { categories, activeCategory } = JSON.parse(body || '{}');
+        if (!wheelSaveConfig(categories, activeCategory)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid categories' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, wheel: wheelState }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── POST /wheel-spin ────────────────────────────────────────
+  if (pathname === '/wheel-spin' && req.method === 'POST') {
+    const result = wheelSpin();
+    if (!result) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Active category has no outcomes' }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, result }));
+    return;
+  }
+
   // ── GET /discord-webhook-state ──────────────────────────────
   if (pathname === '/discord-webhook-state') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1956,6 +2105,7 @@ loadHealthSettings();
 loadThemeState();
 loadSocialConfig();
 loadGiveawayState();
+loadWheelState();
 loadIntegrations();
 loadModTimerState();
 server.listen(PORT, '0.0.0.0', () => {

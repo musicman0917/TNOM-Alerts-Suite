@@ -731,6 +731,89 @@
     color: var(--muted);
   }
 
+  /* ─── Wheel of Chaos Reveal (takeover) ───────────────── */
+  #wheel-reveal {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(.9);
+    width: 560px;
+    text-align: center;
+    background: linear-gradient(155deg, #2A1508, #180C04);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 32px 24px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .4s, transform .4s;
+    box-shadow: 0 0 60px var(--glow-rgba), 0 8px 40px rgba(0,0,0,.7);
+    z-index: 50;
+  }
+  #wheel-reveal.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+  .wc-title {
+    font-family: 'Cinzel', serif;
+    font-size: 16px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--wc-color, var(--amber)); margin-bottom: 4px;
+  }
+  .wc-category {
+    font-family: 'Crimson Pro', serif;
+    font-size: 13px; font-style: italic;
+    color: var(--muted); margin-bottom: 14px;
+  }
+
+  /* Reel window mirrors the giveaway reel, sized for longer phrases */
+  .wc-reel-window {
+    position: relative;
+    height: 168px; /* 3 × 56px rows — keep in sync with WHEEL_ROW_H in JS */
+    overflow: hidden;
+    margin: 0 auto 14px;
+    border-top: 2px solid var(--border);
+    border-bottom: 2px solid var(--border);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 22%, black 78%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0%, black 22%, black 78%, transparent 100%);
+  }
+  .wc-reel-window::before {
+    content: '';
+    position: absolute;
+    top: 56px; left: 0; right: 0; height: 56px;
+    border-top: 1px solid var(--wc-color, var(--amber));
+    border-bottom: 1px solid var(--wc-color, var(--amber));
+    box-shadow: 0 0 16px var(--glow-rgba) inset;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .wc-reel {
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    will-change: transform;
+  }
+  .wc-reel-item {
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 22px;
+    font-family: 'Crimson Pro', serif;
+    font-size: 21px; font-weight: 600;
+    line-height: 1.15;
+    color: var(--warm);
+    opacity: .5;
+    text-align: center;
+    white-space: normal;
+    overflow: hidden;
+  }
+  .wc-reel-item.landed {
+    opacity: 1;
+    color: var(--wc-color, var(--amber));
+    text-shadow: 0 0 20px var(--glow-rgba);
+    animation: giveawayLand .6s cubic-bezier(.34,1.56,.64,1);
+  }
+  .wc-sub {
+    font-family: 'Crimson Pro', serif;
+    font-size: 14px; font-style: italic;
+    color: var(--muted);
+  }
+
   /* ─── Ad Break Timer ──────────────────────────────────── */
   #ad-timer-widget {
     position: fixed;
@@ -1131,6 +1214,16 @@
     <div class="gr-reel" id="giveaway-reel"></div>
   </div>
   <div class="gr-sub" id="giveaway-reveal-sub"></div>
+</div>
+
+<!-- ── Wheel of Chaos Reveal (takeover) ── -->
+<div id="wheel-reveal">
+  <div class="wc-title" id="wheel-title">🎡 Wheel of Chaos</div>
+  <div class="wc-category" id="wheel-category"></div>
+  <div class="wc-reel-window">
+    <div class="wc-reel" id="wheel-reel"></div>
+  </div>
+  <div class="wc-sub" id="wheel-sub"></div>
 </div>
 
 <!-- ── Alert Stage ── -->
@@ -1696,6 +1789,69 @@ function renderGiveaway(data) {
     countEl.textContent = '0 entered';
     return;
   }
+}
+
+// ─── Wheel of Chaos ────────────────────────────────────────────────────────
+const WHEEL_ROW_H    = 56;  // must match .wc-reel-item height in CSS
+const WHEEL_BEFORE   = 24;  // filler rows spun through before the result lands
+let   wheelLandFn    = null;
+let   wheelHideTimer = null;
+
+function renderWheel(data) {
+  if (data.status !== 'spin') return; // category switches / config saves need no overlay action
+
+  const reveal  = document.getElementById('wheel-reveal');
+  const reel    = document.getElementById('wheel-reel');
+  const titleEl = document.getElementById('wheel-title');
+  const catEl   = document.getElementById('wheel-category');
+  const subEl   = document.getElementById('wheel-sub');
+
+  clearTimeout(wheelHideTimer);
+  if (wheelLandFn) { reel.removeEventListener('transitionend', wheelLandFn); wheelLandFn = null; }
+
+  const pool = (data.outcomes && data.outcomes.length) ? data.outcomes : [data.result];
+  titleEl.textContent = `${data.emoji || '🎡'} Wheel of Chaos`;
+  catEl.textContent   = data.label || '';
+  reveal.style.setProperty('--wc-color', data.color || 'var(--amber)');
+  subEl.textContent = '';
+
+  // Build the reel strip: random fillers, then the result, then one trailing
+  // filler so the window's bottom slot isn't empty once it lands.
+  const strip = [];
+  for (let i = 0; i < WHEEL_BEFORE; i++) strip.push(pool[Math.floor(Math.random() * pool.length)]);
+  const landIndex = strip.length;
+  strip.push(data.result);
+  strip.push(pool[Math.floor(Math.random() * pool.length)]);
+
+  reel.style.transition = 'none';
+  reel.style.transform  = 'translateY(0px)';
+  reel.innerHTML = strip.map(o => `<div class="wc-reel-item">${o}</div>`).join('');
+
+  reveal.classList.add('visible');
+
+  // Force a reflow so the 'none' transition above actually applies before
+  // we re-enable it — otherwise the browser can coalesce both into one frame.
+  void reel.offsetHeight;
+
+  requestAnimationFrame(() => {
+    const landY = (landIndex - 1) * WHEEL_ROW_H; // centers landIndex in the 3-row window
+    reel.style.transition = 'transform 3.2s cubic-bezier(0.1, 0.75, 0.15, 1)';
+    reel.style.transform  = `translateY(-${landY}px)`;
+  });
+
+  wheelLandFn = () => {
+    reel.removeEventListener('transitionend', wheelLandFn);
+    wheelLandFn = null;
+    const rows = reel.querySelectorAll('.wc-reel-item');
+    if (rows[landIndex]) rows[landIndex].classList.add('landed');
+    subEl.textContent = '🎲 Chaos has spoken.';
+    spawnNoteBurst(5);
+  };
+  reel.addEventListener('transitionend', wheelLandFn);
+
+  wheelHideTimer = setTimeout(() => {
+    reveal.classList.remove('visible');
+  }, 9000);
 }
 
 // ─── Music Notes ─────────────────────────────────────────────────────────────
@@ -2938,6 +3094,12 @@ function connectAlertBus() {
     // Giveaway update
     if (payload.type === 'giveaway') {
       renderGiveaway(payload);
+      return;
+    }
+
+    // Wheel of Chaos spin
+    if (payload.type === 'wheel') {
+      renderWheel(payload);
       return;
     }
 
