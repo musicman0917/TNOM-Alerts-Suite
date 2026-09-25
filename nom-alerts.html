@@ -2504,6 +2504,15 @@ const CONFIGS = {
     color:   '#A060E0',
     dur:     7000,
   },
+  first: {
+    icon:    null,
+    iconUrl: () => null, // replaced at render time with profile pic
+    label:   'First!',
+    action:  (u)  => `${u} was first!`,
+    sub:     ()   => '',  // replaced at render time with the configured congrats message
+    color:   '#FFD700',
+    dur:     7000,
+  },
   // ── YouTube ──────────────────────────────────────────────
   yt_subscriber: {
     icon:   '▶',
@@ -2696,6 +2705,13 @@ async function fireRaidOut(username, viewers) {
   showAlert('raid_out', username, viewers, null);
 }
 
+async function fireFirst(username, congrats) {
+  const data = await fetchShoutoutData(username);
+  CONFIGS.first.iconUrl = () => data.profileUrl || null;
+  CONFIGS.first.sub     = () => congrats || '🥇 First to arrive tonight!';
+  showAlert('first', username, null, null);
+}
+
 // ─── Sound Config ──────────────────────────────────────────────────────────────
 // Place audio files in your Assets/ folder and update the paths below.
 // Set to null to disable sound for that alert type.
@@ -2827,7 +2843,7 @@ function renderAlert({ type, username, amount, message, goal }) {
   if (cfg.iconUrl) {
     const url = cfg.iconUrl(amount);
     if (url) {
-      const isProfile = (type === 'shoutout' || type === 'raid_out') && !url.startsWith('Assets');
+      const isProfile = (type === 'shoutout' || type === 'raid_out' || type === 'first') && !url.startsWith('Assets');
       const style = isProfile
         ? 'width:48px;height:48px;object-fit:cover;border-radius:50%;border:2px solid var(--border);'
         : 'width:44px;height:44px;object-fit:contain;';
@@ -2888,8 +2904,8 @@ function renderAlert({ type, username, amount, message, goal }) {
   document.getElementById('sub').textContent = '';
 
   const subText = typeof cfg.sub === 'function' ? cfg.sub(username, amount) : cfg.sub;
-  // Show sub text for shoutouts and outgoing raids (game info) — action line covers other alerts
-  if (type === 'shoutout' || type === 'raid_out') {
+  // Show sub text for shoutouts, outgoing raids (game info) and First! (congrats message) — action line covers other alerts
+  if (type === 'shoutout' || type === 'raid_out' || type === 'first') {
     document.getElementById('sub').textContent = subText || '';
   } else {
     document.getElementById('sub').textContent = '';
@@ -3181,6 +3197,8 @@ function connectAlertBus() {
       fireShoutout(payload.username, payload.profileUrl || null, payload.game || null);
     } else if (payload.type === 'raid_out') {
       fireRaidOut(payload.username || 'Someone', payload.amount ?? null);
+    } else if (payload.type === 'first') {
+      fireFirst(payload.username || 'Someone', payload.congrats || null);
     } else if (payload.type) {
       // trackGoal=true only for real events coming from Twitch EventSub (not admin test fires)
       const isReal = payload._real === true;

@@ -732,6 +732,14 @@ const CONFIGS = {
     icon:    '📣',
     dur:     7000,
   },
+  first: {
+    label:   'First!',
+    action:  u  => `${u} was first!`,
+    sub:     () => '🥇 First to arrive tonight!', // replaced at render time
+    color:   '#FFD700',
+    icon:    '🥇',
+    dur:     7000,
+  },
   watch_streak: {
     icon:    '🔥',
     label:   'Watch Streak',
@@ -954,7 +962,7 @@ function renderAlert({ type, username, amount, message, goal }) {
   const iconWrap = document.getElementById('icon-wrap');
   if (cfg.iconUrl) {
     const url       = cfg.iconUrl(amount);
-    const isProfile = (type === 'shoutout' || type === 'raid_out') && url && !url.startsWith('Assets');
+    const isProfile = (type === 'shoutout' || type === 'raid_out' || type === 'first') && url && !url.startsWith('Assets');
     iconWrap.innerHTML = url
       ? `<img src="${url}" class="${isProfile ? 'profile' : ''}" alt="${type}">`
       : cfg.icon || '♪';
@@ -1196,6 +1204,28 @@ async function fireRaidOut(username, viewers) {
   CONFIGS.raid_out.sub = () => game ? `Now catching ${game} live!` : 'Take the party to their tavern!';
   showAlert('raid_out', username, viewers, null);
   console.log(`[raid_out: ${username} | game: ${game}]`);
+}
+
+async function fireFirst(username, congrats) {
+  if (!TWITCH_TOKEN) {
+    for (let i = 0; i < 6; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      if (TWITCH_TOKEN) break;
+    }
+  }
+  let profileUrl = null;
+  if (TWITCH_TOKEN) {
+    try {
+      const headers = { 'Client-ID': TWITCH_CLIENT_ID, 'Authorization': `Bearer ${TWITCH_TOKEN}` };
+      const uRes  = await fetch(`https://api.twitch.tv/helix/users?login=${encodeURIComponent(username)}`, { headers });
+      const uData = await uRes.json();
+      profileUrl  = uData.data?.[0]?.profile_image_url || null;
+    } catch (e) { console.log(`[first] API error: ${e.message}`); }
+  }
+  CONFIGS.first.iconUrl = () => profileUrl;
+  CONFIGS.first.sub     = () => congrats || '🥇 First to arrive tonight!';
+  showAlert('first', username, null, null);
+  console.log(`[first: ${username}]`);
 }
 
 // ─── Stats Widget ─────────────────────────────────────────────────────────────
@@ -1467,6 +1497,8 @@ function connectAlertBus() {
       fireShoutout(payload.username, payload.profileUrl || null, payload.game || null);
     } else if (payload.type === 'raid_out') {
       fireRaidOut(payload.username || 'Someone', payload.amount ?? null);
+    } else if (payload.type === 'first') {
+      fireFirst(payload.username || 'Someone', payload.congrats || null);
     } else if (payload.type) {
       showAlert(payload.type, payload.username || 'Someone', payload.amount ?? null, payload.message ?? null, payload.goal ?? null);
     }

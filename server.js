@@ -479,6 +479,38 @@ function wheelSpin() {
   return { category: cat.id, label: cat.label, display: outcome.display, chat: outcome.chat };
 }
 
+// ─── "First!" Redemption ────────────────────────────────────────────────────
+// A Twitch custom reward that congratulates whoever redeems it — shows their
+// profile picture on the overlay and posts a chat message.
+const FIRST_FILE = path.join(__dirname, '.first-state.json');
+
+let firstState = {
+  redemptionRewardName: 'First!',
+  message: '🥇 First to arrive tonight!',
+};
+
+function loadFirstState() {
+  if (fs.existsSync(FIRST_FILE)) {
+    try { firstState = { ...firstState, ...JSON.parse(fs.readFileSync(FIRST_FILE, 'utf8')) }; }
+    catch (e) { console.log('[first] Could not load state'); }
+  }
+}
+
+function saveFirstState() {
+  fs.writeFileSync(FIRST_FILE, JSON.stringify(firstState, null, 2));
+}
+
+function firstSaveConfig(redemptionRewardName, message) {
+  if (redemptionRewardName != null) {
+    firstState.redemptionRewardName = String(redemptionRewardName).trim().slice(0, 60) || 'First!';
+  }
+  if (message != null) {
+    firstState.message = String(message).trim().slice(0, 200) || '🥇 First to arrive tonight!';
+  }
+  saveFirstState();
+  console.log('[first] Config saved');
+}
+
 // A chatter counts as a mod for chat-command purposes if they're the
 // broadcaster or carry the moderator badge on this message. Shared by the
 // !giveaway and !timer command handlers.
@@ -1370,9 +1402,10 @@ function routeTwitchEvent(subType, event) {
 
     case 'channel.channel_points_custom_reward_redemption.add': {
       const rewardTitle = (event.reward?.title || '').trim().toLowerCase();
-      const target       = (wheelState.redemptionRewardName || '').trim().toLowerCase();
-      console.log(`[wheel] Redemption seen: "${event.reward?.title}" (comparing against configured "${wheelState.redemptionRewardName}")`);
-      if (target && rewardTitle === target) {
+      const wheelTarget  = (wheelState.redemptionRewardName || '').trim().toLowerCase();
+      const firstTarget  = (firstState.redemptionRewardName || '').trim().toLowerCase();
+
+      if (wheelTarget && rewardTitle === wheelTarget) {
         const result = wheelSpin();
         if (result) {
           console.log(`[wheel] Redeemed by ${event.user_name}: ${result.display}`);
@@ -1380,6 +1413,12 @@ function routeTwitchEvent(subType, event) {
           console.log(`[wheel] Redeemed by ${event.user_name}, but the active category has no outcomes`);
           sendChatMessage(`@${event.user_name} redeemed Wheel of Chaos, but there's nothing on the wheel for this category yet — refund incoming!`);
         }
+      } else if (firstTarget && rewardTitle === firstTarget) {
+        broadcastAlert({ type: 'first', username: event.user_name, congrats: firstState.message, _real: true });
+        sendChatMessage(`${firstState.message} @${event.user_name}`);
+        console.log(`[first] Redeemed by ${event.user_name}`);
+      } else {
+        console.log(`[redemption] Seen: "${event.reward?.title}" — no configured redemption matched it`);
       }
       break;
     }
@@ -2061,6 +2100,31 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /first-state ────────────────────────────────────────
+  if (pathname === '/first-state') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(firstState));
+    return;
+  }
+
+  // ── POST /first-config ──────────────────────────────────────
+  if (pathname === '/first-config' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { redemptionRewardName, message } = JSON.parse(body || '{}');
+        firstSaveConfig(redemptionRewardName, message);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, first: firstState }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   // ── GET /discord-webhook-state ──────────────────────────────
   if (pathname === '/discord-webhook-state') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -2190,6 +2254,7 @@ loadThemeState();
 loadSocialConfig();
 loadGiveawayState();
 loadWheelState();
+loadFirstState();
 loadIntegrations();
 loadModTimerState();
 server.listen(PORT, '0.0.0.0', () => {

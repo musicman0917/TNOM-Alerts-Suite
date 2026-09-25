@@ -12,6 +12,7 @@ node_modules/
 .integrations.json
 .mod-timer-state.json
 .wheel-state.json
+.first-state.json
 
 npm-debug.log*
 *.log
