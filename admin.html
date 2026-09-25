@@ -663,10 +663,16 @@
         <input id="first-message" type="text" placeholder="🥇 First to arrive tonight!" />
       </div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button onclick="saveFirstConfig()" style="flex:1;padding:10px;">💾 Save</button>
-      <button onclick="testFirst()" style="flex:1;padding:10px;">🥇 Test</button>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;">
+      <div class="field" style="margin:0;">
+        <label>Test Username (real Twitch login — pulls their actual profile picture)</label>
+        <input id="first-test-user" type="text" placeholder="neighborhoodofmusic" />
+      </div>
+      <button onclick="testFirst()" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">🥇</span> Test
+      </button>
     </div>
+    <button onclick="saveFirstConfig()" style="width:100%;padding:10px;margin-top:8px;">💾 Save</button>
   </div>
 
   <!-- ── Mod Timer ── -->
@@ -1697,13 +1703,14 @@ async function saveFirstConfig() {
 }
 
 async function testFirst() {
+  const username = document.getElementById('first-test-user').value.trim().replace(/^@/, '') || 'neighborhoodofmusic';
   try {
     const res = await fetch(`${OVERLAY_URL}/fire-alert`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ type: 'first', username: 'neighborhoodofmusic', congrats: firstMessage }),
+      body:    JSON.stringify({ type: 'first', username, congrats: firstMessage }),
     });
-    if (res.ok) addLog('Test fired: first — neighborhoodofmusic', 'ok');
+    if (res.ok) addLog(`Test fired: first — ${username}`, 'ok');
     else addLog(`Fire failed: ${res.status}`, 'error');
   } catch (e) {
     addLog(`First! test error: ${e.message}`, 'error');
