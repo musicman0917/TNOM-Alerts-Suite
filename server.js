@@ -487,6 +487,7 @@ const FIRST_FILE = path.join(__dirname, '.first-state.json');
 let firstState = {
   redemptionRewardName: 'First!',
   message: '🥇 First to arrive tonight!',
+  counts: {}, // userId -> { username, count } — how many times each person has redeemed
 };
 
 function loadFirstState() {
@@ -498,6 +499,23 @@ function loadFirstState() {
 
 function saveFirstState() {
   fs.writeFileSync(FIRST_FILE, JSON.stringify(firstState, null, 2));
+}
+
+// 1 -> "1st", 2 -> "2nd", 3 -> "3rd", 11-13 -> "th", etc.
+function ordinal(n) {
+  const suffixes = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
+}
+
+// Records a redemption for this user and returns their new total count.
+function firstRecordRedemption(userId, username) {
+  const entry = firstState.counts[userId] || { username, count: 0 };
+  entry.username = username; // keep display name current in case it changed
+  entry.count += 1;
+  firstState.counts[userId] = entry;
+  saveFirstState();
+  return entry.count;
 }
 
 function firstSaveConfig(redemptionRewardName, message) {
@@ -1414,9 +1432,11 @@ function routeTwitchEvent(subType, event) {
           sendChatMessage(`@${event.user_name} redeemed Wheel of Chaos, but there's nothing on the wheel for this category yet — refund incoming!`);
         }
       } else if (firstTarget && rewardTitle === firstTarget) {
-        broadcastAlert({ type: 'first', username: event.user_name, congrats: firstState.message, _real: true });
-        sendChatMessage(`${firstState.message} @${event.user_name}`);
-        console.log(`[first] Redeemed by ${event.user_name}`);
+        const count = firstRecordRedemption(event.user_id, event.user_name);
+        const countNote = count === 1 ? 'their 1st time!' : `their ${ordinal(count)} time!`;
+        broadcastAlert({ type: 'first', username: event.user_name, congrats: firstState.message, count, _real: true });
+        sendChatMessage(`${firstState.message} @${event.user_name} — ${countNote}`);
+        console.log(`[first] Redeemed by ${event.user_name} (${count} time${count === 1 ? '' : 's'} total)`);
       } else {
         console.log(`[redemption] Seen: "${event.reward?.title}" — no configured redemption matched it`);
       }
