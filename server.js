@@ -1371,6 +1371,7 @@ function routeTwitchEvent(subType, event) {
     case 'channel.channel_points_custom_reward_redemption.add': {
       const rewardTitle = (event.reward?.title || '').trim().toLowerCase();
       const target       = (wheelState.redemptionRewardName || '').trim().toLowerCase();
+      console.log(`[wheel] Redemption seen: "${event.reward?.title}" (comparing against configured "${wheelState.redemptionRewardName}")`);
       if (target && rewardTitle === target) {
         const result = wheelSpin();
         if (result) {
