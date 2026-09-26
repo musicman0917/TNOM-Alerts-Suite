@@ -572,6 +572,12 @@ function buttonPress() {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// Outcomes are full sentences with a %user% placeholder, e.g.
+// "%user% steps on a lego" -> "@someone steps on a lego".
+function buttonFillTemplate(outcome, username) {
+  return outcome.replace(/%user%/gi, `@${username}`);
+}
+
 // ─── "First!" Redemption ────────────────────────────────────────────────────
 // A Twitch custom reward that congratulates whoever redeems it — shows their
 // profile picture on the overlay and posts a chat message.
@@ -1540,7 +1546,7 @@ function routeTwitchEvent(subType, event) {
       } else if (buttonTarget && rewardTitle === buttonTarget) {
         const outcome = buttonPress();
         if (outcome) {
-          sendChatMessage(`🔘 @${event.user_name} pressed the button... ${outcome}`);
+          sendChatMessage(`🔘 ${buttonFillTemplate(outcome, event.user_name)}`);
           console.log(`[button] ${event.user_name} pressed it -> ${outcome}`);
         } else {
           sendChatMessage(`@${event.user_name} pressed the button, but nothing happened — no outcomes configured yet!`);
@@ -2330,15 +2336,27 @@ const server = http.createServer(async (req, res) => {
 
   // ── POST /button-test ───────────────────────────────────────
   if (pathname === '/button-test' && req.method === 'POST') {
-    const outcome = buttonPress();
-    if (!outcome) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'No outcomes configured in either pool' }));
-      return;
-    }
-    sendChatMessage(`[TEST] 🔘 The button was pressed... ${outcome}`);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, outcome }));
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { username } = JSON.parse(body || '{}');
+        const name = (username || 'TestUser').trim().replace(/^@/, '');
+        const outcome = buttonPress();
+        if (!outcome) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'No outcomes configured in either pool' }));
+          return;
+        }
+        const filled = buttonFillTemplate(outcome, name);
+        sendChatMessage(`[TEST] 🔘 ${filled}`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, outcome: filled }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
     return;
   }
 

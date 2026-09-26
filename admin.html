@@ -719,20 +719,28 @@
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px;">
       <div class="field" style="margin:0;">
-        <label style="color:#7EC87E;">Good Outcomes (one per line)</label>
-        <textarea id="button-good-outcomes" rows="6" placeholder="Song request granted, no queue!&#10;+50 loyalty points"></textarea>
+        <label style="color:#7EC87E;">Good Outcomes (one per line — use %user% as a placeholder)</label>
+        <textarea id="button-good-outcomes" rows="6" placeholder="%user% gets the most epic of high fives.&#10;%user% found $20 in their pocket."></textarea>
       </div>
       <div class="field" style="margin:0;">
-        <label style="color:#E07060;">Bad Outcomes (one per line)</label>
-        <textarea id="button-bad-outcomes" rows="6" placeholder="Speak in a whisper for 2 minutes&#10;Type in all lowercase for 5 minutes"></textarea>
+        <label style="color:#E07060;">Bad Outcomes (one per line — use %user% as a placeholder)</label>
+        <textarea id="button-bad-outcomes" rows="6" placeholder="%user% steps on a lego&#10;%user% forgot the words to Tequila"></textarea>
       </div>
     </div>
 
     <div style="font-family:'Crimson Pro',serif;font-size:12px;font-style:italic;color:var(--dark-muted);margin-bottom:12px;">
-      Chat-only — posts "🔘 @user pressed the button... {outcome}" using whichever pool wins the roll.
+      Chat-only — posts "🔘 {outcome}" with %user% replaced by @their-name, using whichever pool wins the roll.
     </div>
 
-    <button onclick="testButtonPress()" style="width:100%;padding:10px;margin-bottom:8px;">🔘 Test Press</button>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;margin-bottom:8px;">
+      <div class="field" style="margin:0;">
+        <label>Test Username</label>
+        <input id="button-test-user" type="text" placeholder="neighborhoodofmusic" />
+      </div>
+      <button onclick="testButtonPress()" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">🔘</span> Test Press
+      </button>
+    </div>
     <button onclick="saveButtonConfig()" style="width:100%;padding:10px;">💾 Save</button>
   </div>
 
@@ -1853,8 +1861,13 @@ async function saveButtonConfig() {
 }
 
 async function testButtonPress() {
+  const username = document.getElementById('button-test-user').value.trim().replace(/^@/, '') || 'neighborhoodofmusic';
   try {
-    const res  = await fetch(`${OVERLAY_URL}/button-test`, { method: 'POST' });
+    const res  = await fetch(`${OVERLAY_URL}/button-test`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ username }),
+    });
     const data = await res.json();
     if (res.ok) addLog(`Test press posted to chat: ${data.outcome}`, 'ok');
     else addLog(`Test press failed: ${data.error || res.status}`, 'warn');
