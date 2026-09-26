@@ -13,6 +13,7 @@ node_modules/
 .mod-timer-state.json
 .wheel-state.json
 .first-state.json
+.checkin-state.json
 
 npm-debug.log*
 *.log

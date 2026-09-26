@@ -479,6 +479,49 @@ function wheelSpin() {
   return { category: cat.id, label: cat.label, display: outcome.display, chat: outcome.chat };
 }
 
+// ─── Daily Check-in Redemption ──────────────────────────────────────────────
+// A Twitch custom reward that's silent on the overlay — just tracks how many
+// times each person has redeemed it and announces the running count in chat.
+const CHECKIN_FILE = path.join(__dirname, '.checkin-state.json');
+
+let checkinState = {
+  redemptionRewardName: '🎤Daily check-in',
+  message: '✅ Checked in!',
+  counts: {}, // userId -> { username, count }
+};
+
+function loadCheckinState() {
+  if (fs.existsSync(CHECKIN_FILE)) {
+    try { checkinState = { ...checkinState, ...JSON.parse(fs.readFileSync(CHECKIN_FILE, 'utf8')) }; }
+    catch (e) { console.log('[checkin] Could not load state'); }
+  }
+}
+
+function saveCheckinState() {
+  fs.writeFileSync(CHECKIN_FILE, JSON.stringify(checkinState, null, 2));
+}
+
+function checkinSaveConfig(redemptionRewardName, message) {
+  if (redemptionRewardName != null) {
+    checkinState.redemptionRewardName = String(redemptionRewardName).trim().slice(0, 60) || '🎤Daily check-in';
+  }
+  if (message != null) {
+    checkinState.message = String(message).trim().slice(0, 200) || '✅ Checked in!';
+  }
+  saveCheckinState();
+  console.log('[checkin] Config saved');
+}
+
+// Records a check-in for this user and returns their new total count.
+function checkinRecord(userId, username) {
+  const entry = checkinState.counts[userId] || { username, count: 0 };
+  entry.username = username; // keep display name current in case it changed
+  entry.count += 1;
+  checkinState.counts[userId] = entry;
+  saveCheckinState();
+  return entry.count;
+}
+
 // ─── "First!" Redemption ────────────────────────────────────────────────────
 // A Twitch custom reward that congratulates whoever redeems it — shows their
 // profile picture on the overlay and posts a chat message.
@@ -1419,9 +1462,10 @@ function routeTwitchEvent(subType, event) {
       break;
 
     case 'channel.channel_points_custom_reward_redemption.add': {
-      const rewardTitle = (event.reward?.title || '').trim().toLowerCase();
+      const rewardTitle  = (event.reward?.title || '').trim().toLowerCase();
       const wheelTarget  = (wheelState.redemptionRewardName || '').trim().toLowerCase();
       const firstTarget  = (firstState.redemptionRewardName || '').trim().toLowerCase();
+      const checkinTarget = (checkinState.redemptionRewardName || '').trim().toLowerCase();
 
       if (wheelTarget && rewardTitle === wheelTarget) {
         const result = wheelSpin();
@@ -1437,6 +1481,11 @@ function routeTwitchEvent(subType, event) {
         broadcastAlert({ type: 'first', username: event.user_name, congrats: firstState.message, count, _real: true });
         sendChatMessage(`${firstState.message} @${event.user_name} — ${countNote}`);
         console.log(`[first] Redeemed by ${event.user_name} (${count} time${count === 1 ? '' : 's'} total)`);
+      } else if (checkinTarget && rewardTitle === checkinTarget) {
+        const count = checkinRecord(event.user_id, event.user_name);
+        const countNote = count === 1 ? 'their 1st check-in!' : `their ${ordinal(count)} check-in!`;
+        sendChatMessage(`${checkinState.message} @${event.user_name} — ${countNote}`);
+        console.log(`[checkin] ${event.user_name} checked in (${count} time${count === 1 ? '' : 's'} total)`);
       } else {
         console.log(`[redemption] Seen: "${event.reward?.title}" — no configured redemption matched it`);
       }
@@ -2145,6 +2194,55 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /checkin-state ──────────────────────────────────────
+  if (pathname === '/checkin-state') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(checkinState));
+    return;
+  }
+
+  // ── POST /checkin-config ────────────────────────────────────
+  if (pathname === '/checkin-config' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { redemptionRewardName, message } = JSON.parse(body || '{}');
+        checkinSaveConfig(redemptionRewardName, message);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, checkin: checkinState }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── POST /checkin-test ──────────────────────────────────────
+  // Previews the chat announcement for a username without touching their
+  // real count — lets the reward name/message be verified before going live.
+  if (pathname === '/checkin-test' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { username } = JSON.parse(body || '{}');
+        const name = (username || 'TestUser').trim().replace(/^@/, '');
+        const existing = Object.values(checkinState.counts).find(e => e.username.toLowerCase() === name.toLowerCase());
+        const previewCount = (existing?.count || 0) + 1;
+        const countNote = previewCount === 1 ? 'their 1st check-in!' : `their ${ordinal(previewCount)} check-in!`;
+        sendChatMessage(`[TEST] ${checkinState.message} @${name} — ${countNote}`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, previewCount }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   // ── GET /discord-webhook-state ──────────────────────────────
   if (pathname === '/discord-webhook-state') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -2275,6 +2373,7 @@ loadSocialConfig();
 loadGiveawayState();
 loadWheelState();
 loadFirstState();
+loadCheckinState();
 loadIntegrations();
 loadModTimerState();
 server.listen(PORT, '0.0.0.0', () => {

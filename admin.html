@@ -675,6 +675,34 @@
     <button onclick="saveFirstConfig()" style="width:100%;padding:10px;margin-top:8px;">💾 Save</button>
   </div>
 
+  <!-- ── Daily Check-in Redemption ── -->
+  <div class="panel full">
+    <div class="panel-title">Daily Check-in</div>
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-bottom:12px;">
+      <div class="field" style="margin:0;">
+        <label>Reward Name (must match the Twitch redemption exactly)</label>
+        <input id="checkin-reward-name" type="text" placeholder="🎤Daily check-in" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label>Chat Message Prefix</label>
+        <input id="checkin-message" type="text" placeholder="✅ Checked in!" />
+      </div>
+    </div>
+    <div style="font-family:'Crimson Pro',serif;font-size:12px;font-style:italic;color:var(--dark-muted);margin-bottom:12px;">
+      Silent on the overlay — just tracks a per-viewer count and posts it to chat, e.g. "✅ Checked in! @user — their 3rd check-in!"
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;">
+      <div class="field" style="margin:0;">
+        <label>Test Username</label>
+        <input id="checkin-test-user" type="text" placeholder="neighborhoodofmusic" />
+      </div>
+      <button onclick="testCheckin()" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">🎤</span> Test
+      </button>
+    </div>
+    <button onclick="saveCheckinConfig()" style="width:100%;padding:10px;margin-top:8px;">💾 Save</button>
+  </div>
+
   <!-- ── Mod Timer ── -->
   <div class="panel full">
     <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
@@ -1717,6 +1745,49 @@ async function testFirst() {
   }
 }
 
+// ─── Daily Check-in ───────────────────────────────────────────────────────────
+async function fetchCheckinState() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/checkin-state`);
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('checkin-reward-name').value = data.redemptionRewardName || '🎤Daily check-in';
+    document.getElementById('checkin-message').value     = data.message || '✅ Checked in!';
+  } catch (e) {}
+}
+
+async function saveCheckinConfig() {
+  const redemptionRewardName = document.getElementById('checkin-reward-name').value;
+  const message               = document.getElementById('checkin-message').value;
+  try {
+    const res = await fetch(`${OVERLAY_URL}/checkin-config`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ redemptionRewardName, message }),
+    });
+    if (res.ok) addLog('Daily Check-in config saved ✓', 'ok');
+    else addLog('Daily Check-in config save failed', 'error');
+  } catch (e) {
+    addLog(`Daily Check-in config save error: ${e.message}`, 'error');
+  }
+}
+
+async function testCheckin() {
+  const username = document.getElementById('checkin-test-user').value.trim().replace(/^@/, '') || 'neighborhoodofmusic';
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/checkin-test`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ username }),
+    });
+    const data = await res.json();
+    if (res.ok) addLog(`Test check-in posted to chat — ${username} (would be their ${data.previewCount}${data.previewCount===1?'st':data.previewCount===2?'nd':data.previewCount===3?'rd':'th'})`, 'ok');
+    else addLog(`Fire failed: ${res.status}`, 'error');
+  } catch (e) {
+    addLog(`Check-in test error: ${e.message}`, 'error');
+  }
+}
+
 async function fetchGiveawayState() {
   try {
     const res  = await fetch(`${OVERLAY_URL}/giveaway-state`);
@@ -1811,6 +1882,7 @@ fetchDiscordWebhook();
 fetchModTimerState();
 fetchWheelState(true);
 fetchFirstState();
+fetchCheckinState();
 updateGoalVisButtons();
 onGoalTypeChange();
 onRemoveTypeChange();
