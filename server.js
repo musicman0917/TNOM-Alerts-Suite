@@ -522,6 +522,56 @@ function checkinRecord(userId, username) {
   return entry.count;
 }
 
+// ─── "Press This Button!!" Redemption ───────────────────────────────────────
+// Chat-only, no overlay. Picks a random outcome from either the "good" or
+// "bad" pool (weighted by goodOddsPercent) and posts it to chat.
+const BUTTON_FILE = path.join(__dirname, '.button-state.json');
+
+let buttonState = {
+  redemptionRewardName: 'Press this button!!',
+  goodOddsPercent: 50,
+  good: [], // array of chat-message strings
+  bad:  [], // array of chat-message strings
+};
+
+function loadButtonState() {
+  if (fs.existsSync(BUTTON_FILE)) {
+    try { buttonState = { ...buttonState, ...JSON.parse(fs.readFileSync(BUTTON_FILE, 'utf8')) }; }
+    catch (e) { console.log('[button] Could not load state'); }
+  }
+}
+
+function saveButtonState() {
+  fs.writeFileSync(BUTTON_FILE, JSON.stringify(buttonState, null, 2));
+}
+
+function buttonSaveConfig(redemptionRewardName, goodOddsPercent, good, bad) {
+  if (redemptionRewardName != null) {
+    buttonState.redemptionRewardName = String(redemptionRewardName).trim().slice(0, 60) || 'Press this button!!';
+  }
+  if (goodOddsPercent != null) {
+    const n = Number(goodOddsPercent);
+    buttonState.goodOddsPercent = Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : buttonState.goodOddsPercent;
+  }
+  if (Array.isArray(good)) {
+    buttonState.good = good.map(s => String(s).trim().slice(0, 300)).filter(Boolean);
+  }
+  if (Array.isArray(bad)) {
+    buttonState.bad = bad.map(s => String(s).trim().slice(0, 300)).filter(Boolean);
+  }
+  saveButtonState();
+  console.log('[button] Config saved');
+}
+
+// Picks a pool by odds, falling back to whichever pool actually has entries.
+function buttonPress() {
+  const wantGood = Math.random() * 100 < buttonState.goodOddsPercent;
+  let pool = wantGood ? buttonState.good : buttonState.bad;
+  if (!pool.length) pool = wantGood ? buttonState.bad : buttonState.good;
+  if (!pool.length) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 // ─── "First!" Redemption ────────────────────────────────────────────────────
 // A Twitch custom reward that congratulates whoever redeems it — shows their
 // profile picture on the overlay and posts a chat message.
@@ -1462,10 +1512,11 @@ function routeTwitchEvent(subType, event) {
       break;
 
     case 'channel.channel_points_custom_reward_redemption.add': {
-      const rewardTitle  = (event.reward?.title || '').trim().toLowerCase();
-      const wheelTarget  = (wheelState.redemptionRewardName || '').trim().toLowerCase();
-      const firstTarget  = (firstState.redemptionRewardName || '').trim().toLowerCase();
+      const rewardTitle   = (event.reward?.title || '').trim().toLowerCase();
+      const wheelTarget   = (wheelState.redemptionRewardName || '').trim().toLowerCase();
+      const firstTarget   = (firstState.redemptionRewardName || '').trim().toLowerCase();
       const checkinTarget = (checkinState.redemptionRewardName || '').trim().toLowerCase();
+      const buttonTarget  = (buttonState.redemptionRewardName || '').trim().toLowerCase();
 
       if (wheelTarget && rewardTitle === wheelTarget) {
         const result = wheelSpin();
@@ -1486,6 +1537,15 @@ function routeTwitchEvent(subType, event) {
         const countNote = count === 1 ? 'their 1st check-in!' : `their ${ordinal(count)} check-in!`;
         sendChatMessage(`${checkinState.message} @${event.user_name} — ${countNote}`);
         console.log(`[checkin] ${event.user_name} checked in (${count} time${count === 1 ? '' : 's'} total)`);
+      } else if (buttonTarget && rewardTitle === buttonTarget) {
+        const outcome = buttonPress();
+        if (outcome) {
+          sendChatMessage(`🔘 @${event.user_name} pressed the button... ${outcome}`);
+          console.log(`[button] ${event.user_name} pressed it -> ${outcome}`);
+        } else {
+          sendChatMessage(`@${event.user_name} pressed the button, but nothing happened — no outcomes configured yet!`);
+          console.log(`[button] ${event.user_name} pressed it, but no outcomes are configured`);
+        }
       } else {
         console.log(`[redemption] Seen: "${event.reward?.title}" — no configured redemption matched it`);
       }
@@ -2243,6 +2303,45 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /button-state ───────────────────────────────────────
+  if (pathname === '/button-state') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(buttonState));
+    return;
+  }
+
+  // ── POST /button-config ─────────────────────────────────────
+  if (pathname === '/button-config' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { redemptionRewardName, goodOddsPercent, good, bad } = JSON.parse(body || '{}');
+        buttonSaveConfig(redemptionRewardName, goodOddsPercent, good, bad);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, button: buttonState }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── POST /button-test ───────────────────────────────────────
+  if (pathname === '/button-test' && req.method === 'POST') {
+    const outcome = buttonPress();
+    if (!outcome) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'No outcomes configured in either pool' }));
+      return;
+    }
+    sendChatMessage(`[TEST] 🔘 The button was pressed... ${outcome}`);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, outcome }));
+    return;
+  }
+
   // ── GET /discord-webhook-state ──────────────────────────────
   if (pathname === '/discord-webhook-state') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -2374,6 +2473,7 @@ loadGiveawayState();
 loadWheelState();
 loadFirstState();
 loadCheckinState();
+loadButtonState();
 loadIntegrations();
 loadModTimerState();
 server.listen(PORT, '0.0.0.0', () => {

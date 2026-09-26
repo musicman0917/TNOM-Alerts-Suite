@@ -14,6 +14,7 @@ node_modules/
 .wheel-state.json
 .first-state.json
 .checkin-state.json
+.button-state.json
 
 npm-debug.log*
 *.log

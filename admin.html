@@ -703,6 +703,39 @@
     <button onclick="saveCheckinConfig()" style="width:100%;padding:10px;margin-top:8px;">💾 Save</button>
   </div>
 
+  <!-- ── Press This Button!! Redemption ── -->
+  <div class="panel full">
+    <div class="panel-title">Press This Button!!</div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px;">
+      <div class="field" style="margin:0;">
+        <label>Reward Name (must match the Twitch redemption exactly)</label>
+        <input id="button-reward-name" type="text" placeholder="Press this button!!" />
+      </div>
+      <div class="field" style="margin:0;">
+        <label>Good Odds (%)</label>
+        <input id="button-good-odds" type="number" min="0" max="100" placeholder="50" />
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px;">
+      <div class="field" style="margin:0;">
+        <label style="color:#7EC87E;">Good Outcomes (one per line)</label>
+        <textarea id="button-good-outcomes" rows="6" placeholder="Song request granted, no queue!&#10;+50 loyalty points"></textarea>
+      </div>
+      <div class="field" style="margin:0;">
+        <label style="color:#E07060;">Bad Outcomes (one per line)</label>
+        <textarea id="button-bad-outcomes" rows="6" placeholder="Speak in a whisper for 2 minutes&#10;Type in all lowercase for 5 minutes"></textarea>
+      </div>
+    </div>
+
+    <div style="font-family:'Crimson Pro',serif;font-size:12px;font-style:italic;color:var(--dark-muted);margin-bottom:12px;">
+      Chat-only — posts "🔘 @user pressed the button... {outcome}" using whichever pool wins the roll.
+    </div>
+
+    <button onclick="testButtonPress()" style="width:100%;padding:10px;margin-bottom:8px;">🔘 Test Press</button>
+    <button onclick="saveButtonConfig()" style="width:100%;padding:10px;">💾 Save</button>
+  </div>
+
   <!-- ── Mod Timer ── -->
   <div class="panel full">
     <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
@@ -1788,6 +1821,48 @@ async function testCheckin() {
   }
 }
 
+// ─── Press This Button!! ──────────────────────────────────────────────────────
+async function fetchButtonState() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/button-state`);
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('button-reward-name').value  = data.redemptionRewardName || 'Press this button!!';
+    document.getElementById('button-good-odds').value    = data.goodOddsPercent ?? 50;
+    document.getElementById('button-good-outcomes').value = (data.good || []).join('\n');
+    document.getElementById('button-bad-outcomes').value  = (data.bad || []).join('\n');
+  } catch (e) {}
+}
+
+async function saveButtonConfig() {
+  const redemptionRewardName = document.getElementById('button-reward-name').value;
+  const goodOddsPercent       = document.getElementById('button-good-odds').value;
+  const good = document.getElementById('button-good-outcomes').value.split('\n').map(s => s.trim()).filter(Boolean);
+  const bad  = document.getElementById('button-bad-outcomes').value.split('\n').map(s => s.trim()).filter(Boolean);
+  try {
+    const res = await fetch(`${OVERLAY_URL}/button-config`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ redemptionRewardName, goodOddsPercent, good, bad }),
+    });
+    if (res.ok) addLog('Press This Button!! config saved ✓', 'ok');
+    else addLog('Press This Button!! config save failed', 'error');
+  } catch (e) {
+    addLog(`Press This Button!! config save error: ${e.message}`, 'error');
+  }
+}
+
+async function testButtonPress() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/button-test`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) addLog(`Test press posted to chat: ${data.outcome}`, 'ok');
+    else addLog(`Test press failed: ${data.error || res.status}`, 'warn');
+  } catch (e) {
+    addLog(`Button test error: ${e.message}`, 'error');
+  }
+}
+
 async function fetchGiveawayState() {
   try {
     const res  = await fetch(`${OVERLAY_URL}/giveaway-state`);
@@ -1883,6 +1958,7 @@ fetchModTimerState();
 fetchWheelState(true);
 fetchFirstState();
 fetchCheckinState();
+fetchButtonState();
 updateGoalVisButtons();
 onGoalTypeChange();
 onRemoveTypeChange();
