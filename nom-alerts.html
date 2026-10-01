@@ -3288,7 +3288,7 @@ const SB_SUB_TWITCH = {
   request: 'Subscribe',
   id:      'nom-alerts-twitch',
   events: {
-    Twitch: ['Follow','Cheer','Sub','ReSub','GiftSub','GiftBomb','Raid','ChatMessage','TwitchWatchStreak','RewardRedemption'],
+    Twitch: ['Follow','Cheer','Sub','ReSub','GiftSub','GiftBomb','Raid','ChatMessage','RewardRedemption'],
   },
 };
 
@@ -3345,15 +3345,6 @@ function sbConnect() {
         showAlert('daily_checkin', name, null, null);
         return;
       }
-      return;
-    }
-
-    // ── Watch Streak ─────────────────────────────────────────
-    if (src === 'Twitch' && type === 'TwitchWatchStreak') {
-      const name   = d.user || d.userName || 'Someone';
-      const streak = d.watchStreak || d.streak || '?';
-      console.log(`[watch streak] ${name} — streak: ${streak}`);
-      showAlert('watch_streak', name, streak, null);
       return;
     }
 

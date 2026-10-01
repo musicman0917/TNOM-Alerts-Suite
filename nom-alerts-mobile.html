@@ -1458,7 +1458,7 @@ function connectStreamerBot() {
       request: 'Subscribe',
       id: 'nom-mobile',
       events: {
-        Twitch:     ['TwitchWatchStreak','RewardRedemption'],
+        Twitch:     ['RewardRedemption'],
         YouTube:    ['NewSubscriber','SuperChat','SuperSticker','NewSponsor','MemberMileStone','MembershipGift','GiftMembershipReceived'],
       },
     }));
@@ -1477,13 +1477,6 @@ function connectStreamerBot() {
         const name = d.user_name || d.user?.name || d.userName || 'Someone';
         showAlert('daily_checkin', name, null, null);
       }
-      return;
-    }
-
-    if (src === 'Twitch' && type === 'TwitchWatchStreak') {
-      const name   = d.user || d.userName || 'Someone';
-      const streak = d.watchStreak || d.streak || '?';
-      showAlert('watch_streak', name, streak, null);
       return;
     }
 
