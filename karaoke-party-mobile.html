@@ -17,6 +17,75 @@
       --gold:          #c8a030;
       --gold-light:    #f0d060;
       --crimson:       #8b1818;
+
+      --accent-rgb:      200,160,48;
+      --wood-border-rgb: 92,46,16;
+
+      --panel-bg-color: #7a6038;
+      --panel-border:   #1a0d04;
+
+      --plaque-grad: linear-gradient(155deg, #6b3a1e, #3a1c08 50%, #5c2e10 80%, #2a1406);
+      --plaque-border: #1e0f04;
+
+      --text-grad: linear-gradient(180deg, #fff3c8 0%, #e8c040 30%, #a8801c 65%, #6b4e10 100%);
+      --name-grad: linear-gradient(180deg, #fff6d8 0%, #f0d060 22%, #c8a030 55%, #8b6010 80%, #c8a030 100%);
+
+      --bar-grad: linear-gradient(180deg, #4a2410 0%, #2e1606 55%, #3a1c08 80%, #1e0c04 100%);
+      --bar-border: #1a0d04;
+    }
+
+    /* ─── Disney Theme ─────────────────────────────────── */
+    body[data-theme="disney"] {
+      --parchment:     #e9e2f7;
+      --parchment-mid: #d2c4ec;
+      --ink:           #1a0a2e;
+      --ink-mid:       #3d2a5c;
+      --wood-mid:      #5a2e9e;
+      --gold:          #ffd700;
+      --gold-light:    #fff0a0;
+      --crimson:       #9b59b6;
+
+      --accent-rgb:      155,89,182;
+      --wood-border-rgb: 123,47,190;
+
+      --panel-bg-color: #2d1b4e;
+      --panel-border:   #0d0620;
+
+      --plaque-grad: linear-gradient(155deg, #4a2d7a, #1a0a2e 50%, #3d1f66 80%, #0d0620);
+      --plaque-border: #0d0620;
+
+      --text-grad: linear-gradient(180deg, #fff8dc 0%, #ffd700 30%, #9b59b6 65%, #4a2d7a 100%);
+      --name-grad: linear-gradient(180deg, #fff8dc 0%, #ffd700 22%, #9b59b6 55%, #7b2fbe 80%, #ffd700 100%);
+
+      --bar-grad: linear-gradient(180deg, #4a2d7a 0%, #2d1b4e 55%, #1a0a2e 80%, #0d0620 100%);
+      --bar-border: #0d0620;
+    }
+
+    /* ─── Halloween Theme ──────────────────────────────── */
+    body[data-theme="halloween"] {
+      --parchment:     #e8dcc8;
+      --parchment-mid: #d4bc94;
+      --ink:           #1a0a10;
+      --ink-mid:       #3d1c10;
+      --wood-mid:      #6a1b9a;
+      --gold:          #ff7518;
+      --gold-light:    #ffa940;
+      --crimson:       #c9184a;
+
+      --accent-rgb:      255,117,24;
+      --wood-border-rgb: 106,27,154;
+
+      --panel-bg-color: #1a0a20;
+      --panel-border:   #0a0510;
+
+      --plaque-grad: linear-gradient(155deg, #4a1a5c, #1a0a20 50%, #3d1050 80%, #0a0510);
+      --plaque-border: #0a0510;
+
+      --text-grad: linear-gradient(180deg, #ffe8c8 0%, #ff7518 30%, #6a1b9a 65%, #3d1050 100%);
+      --name-grad: linear-gradient(180deg, #ffe8c8 0%, #ffa940 22%, #ff7518 55%, #6a1b9a 80%, #ff7518 100%);
+
+      --bar-grad: linear-gradient(180deg, #3d1050 0%, #2a0a38 55%, #1a0a20 80%, #0a0510 100%);
+      --bar-border: #0a0510;
     }
 
     html, body {
@@ -32,10 +101,11 @@
       position: relative;
       background:
         repeating-linear-gradient(176deg, rgba(0,0,0,0.08) 0px, transparent 2px, transparent 9px, rgba(255,200,140,0.035) 10px, transparent 12px),
-        linear-gradient(155deg, #6b3a1e, #3a1c08 50%, #5c2e10 80%, #2a1406);
-      border: 2px solid #1e0f04; border-radius: 4px;
+        var(--plaque-grad);
+      border: 2px solid var(--plaque-border); border-radius: 4px;
       box-shadow: inset 0 2px 0 rgba(255,210,150,0.10), inset 0 -4px 10px rgba(0,0,0,0.55), 2px 4px 10px rgba(0,0,0,0.55);
       padding: 8px 28px; text-align: center; flex-shrink: 0; z-index: 5;
+      transition: background .4s, border-color .4s;
     }
     .wood-plaque::before, .wood-plaque::after {
       content: ''; position: absolute; top: 7px;
@@ -47,7 +117,7 @@
     .plaque-label {
       font-family: 'Cinzel', serif; font-weight: 700;
       font-size: 12px; letter-spacing: 4px; text-transform: uppercase;
-      background: linear-gradient(180deg, #fff3c8 0%, #e8c040 30%, #a8801c 65%, #6b4e10 100%);
+      background: var(--text-grad);
       -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
     }
 
@@ -59,10 +129,11 @@
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 272px;
-      background-color: #7a6038;
+      background-color: var(--panel-bg-color);
       background-image: url('Assets/burlap.png');
       background-repeat: no-repeat; background-size: cover;
-      border-bottom: 4px solid #1a0d04;
+      background-blend-mode: multiply;
+      border-bottom: 4px solid var(--panel-border);
       box-shadow: 0 4px 24px rgba(0,0,0,0.70), inset 0 0 60px rgba(0,0,0,0.45);
       display: flex;
       flex-direction: column;
@@ -70,6 +141,7 @@
       padding: 12px 14px;
       z-index: 10;
       overflow: hidden;
+      transition: background-color .4s, border-color .4s;
     }
 
     #top-section::after {
@@ -93,12 +165,13 @@
       background: var(--parchment);
       background-image:
         linear-gradient(140deg, rgba(255,255,255,0.22) 0%, transparent 55%),
-        radial-gradient(ellipse 35% 30% at 88% 88%, rgba(120,80,30,0.18) 0%, transparent 100%);
-      border: 2px solid rgba(92,46,16,0.38); border-radius: 4px;
-      box-shadow: 2px 3px 12px rgba(0,0,0,0.42), inset 0 0 14px rgba(160,120,50,0.15);
+        radial-gradient(ellipse 35% 30% at 88% 88%, rgba(var(--accent-rgb),0.18) 0%, transparent 100%);
+      border: 2px solid rgba(var(--wood-border-rgb),0.38); border-radius: 4px;
+      box-shadow: 2px 3px 12px rgba(0,0,0,0.42), inset 0 0 14px rgba(var(--accent-rgb),0.15);
       position: relative;
       min-height: 120px;
       align-items: center;
+      transition: background .4s;
     }
     #queue-row::-webkit-scrollbar { display: none; }
 
@@ -106,7 +179,7 @@
     #queue-row::before {
       content: ''; position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
       width: 13px; height: 13px;
-      background: radial-gradient(circle at 38% 35%, #e0d060, #806010);
+      background: radial-gradient(circle at 38% 35%, var(--gold-light), var(--wood-mid));
       border-radius: 50%; border: 1px solid rgba(0,0,0,0.25);
       box-shadow: 1px 2px 5px rgba(0,0,0,0.50);
     }
@@ -130,8 +203,8 @@
       animation: cardIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
     .singer-card.next-up {
-      background: rgba(200,160,48,0.18);
-      border: 1px solid rgba(200,160,48,0.35);
+      background: rgba(var(--accent-rgb),0.18);
+      border: 1px solid rgba(var(--accent-rgb),0.35);
     }
     @keyframes cardIn { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
@@ -152,7 +225,7 @@
     .card-avatar img { width: 100%; height: 100%; object-fit: cover; }
     .card-avatar-init { font-family: 'Cinzel', serif; font-weight: 700; font-size: 20px; color: var(--ink); }
 
-    .singer-card.next-up .card-avatar { border-color: rgba(200,160,48,0.6); width: 60px; height: 60px; }
+    .singer-card.next-up .card-avatar { border-color: rgba(var(--accent-rgb),0.6); width: 60px; height: 60px; }
 
     .card-name {
       font-family: 'Cinzel', serif; font-weight: 700;
@@ -176,12 +249,13 @@
       height: 80px;
       background:
         repeating-linear-gradient(176deg, rgba(0,0,0,0.08) 0px, transparent 2px, transparent 9px, rgba(255,200,140,0.035) 10px, transparent 12px),
-        linear-gradient(180deg, #4a2410 0%, #2e1606 55%, #3a1c08 80%, #1e0c04 100%);
-      border-top: 3px solid #1a0d04;
+        var(--bar-grad);
+      border-top: 3px solid var(--bar-border);
       box-shadow: 0 -4px 20px rgba(0,0,0,0.60), inset 0 2px 0 rgba(255,210,150,0.08);
       display: flex; align-items: center; gap: 14px;
       padding: 0 24px;
       z-index: 20;
+      transition: background .4s, border-color .4s;
     }
 
     #now-singing-bar::before, #now-singing-bar::after {
@@ -194,21 +268,21 @@
 
     .mic-icon { font-size: 26px; flex-shrink: 0; animation: micPulse 2.2s ease-in-out infinite; }
     @keyframes micPulse {
-      0%,100% { filter: drop-shadow(0 0 4px rgba(200,160,48,0.25)); }
-      50%     { filter: drop-shadow(0 0 14px rgba(200,160,48,0.65)); }
+      0%,100% { filter: drop-shadow(0 0 4px rgba(var(--accent-rgb),0.25)); }
+      50%     { filter: drop-shadow(0 0 14px rgba(var(--accent-rgb),0.65)); }
     }
     .now-label {
       font-family: 'Cinzel', serif; font-weight: 700;
       font-size: 10px; letter-spacing: 4px; text-transform: uppercase;
-      background: linear-gradient(180deg, #fff3c8 0%, #e8c040 30%, #a8801c 65%, #6b4e10 100%);
+      background: var(--text-grad);
       -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
       white-space: nowrap; flex-shrink: 0;
     }
-    .bar-divider { width: 2px; height: 42px; background: linear-gradient(180deg, transparent, rgba(200,160,48,0.45), transparent); flex-shrink: 0; }
+    .bar-divider { width: 2px; height: 42px; background: linear-gradient(180deg, transparent, rgba(var(--accent-rgb),0.45), transparent); flex-shrink: 0; }
 
     .now-avatar-wrap {
       width: 48px; height: 48px; border-radius: 50%;
-      border: 2px solid rgba(200,160,48,0.45); overflow: hidden; flex-shrink: 0;
+      border: 2px solid rgba(var(--accent-rgb),0.45); overflow: hidden; flex-shrink: 0;
       filter: sepia(30%) contrast(1.05);
       background: rgba(40,20,8,0.6);
       display: flex; align-items: center; justify-content: center;
@@ -218,7 +292,7 @@
 
     #now-name {
       font-family: 'Ringbearer', 'Cinzel', serif; font-size: 24px;
-      background: linear-gradient(180deg, #fff6d8 0%, #f0d060 22%, #c8a030 55%, #8b6010 80%, #c8a030 100%);
+      background: var(--name-grad);
       -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       max-width: 340px; flex-shrink: 0;
@@ -369,6 +443,42 @@ function scaleToFit() {
 }
 window.addEventListener('resize', scaleToFit);
 scaleToFit();
+
+// ============================================================
+//  THEME SYNC — match whatever theme is set on the main overlay
+// ============================================================
+function applyKaraokeTheme(name) {
+  document.body.dataset.theme = (name && name !== 'tavern') ? name : '';
+  try { localStorage.setItem('nom-theme', name); } catch (e) {}
+}
+
+async function initKaraokeTheme() {
+  try {
+    const res  = await fetch('/theme-state');
+    const data = await res.json();
+    if (data?.theme) { applyKaraokeTheme(data.theme); return; }
+  } catch (e) {}
+  try {
+    const saved = localStorage.getItem('nom-theme');
+    if (saved) applyKaraokeTheme(saved);
+  } catch (e) {}
+}
+
+let themeSse;
+function connectThemeSSE() {
+  if (themeSse) themeSse.close();
+  themeSse = new EventSource('/alerts-stream');
+  themeSse.onmessage = (ev) => {
+    try {
+      const payload = JSON.parse(ev.data);
+      if (payload.type === 'theme-switch') applyKaraokeTheme(payload.theme);
+    } catch (e) {}
+  };
+  themeSse.onerror = () => { themeSse.close(); setTimeout(connectThemeSSE, 3000); };
+}
+
+initKaraokeTheme();
+connectThemeSSE();
 
 connectSSE();
 </script>
