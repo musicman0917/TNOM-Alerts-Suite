@@ -1566,6 +1566,16 @@ function routeTwitchEvent(subType, event) {
       const rawText = (event.message?.text || '').trim();
       const text    = rawText.toLowerCase();
 
+      // Broadcast every chat message for overlay display purposes (e.g. the
+      // karaoke overlay's Tavern Chat panel) — separate from the mod-command
+      // handling below, which only reacts to specific commands.
+      broadcastAlert({
+        type:     'chat-message',
+        username: event.chatter_user_name,
+        text:     rawText,
+        color:    event.color || null,
+      });
+
       // Entry keyword — anyone, only while a giveaway is actively collecting.
       if (giveawayState.active && text === giveawayState.keyword.toLowerCase()) {
         const userId   = event.chatter_user_id;

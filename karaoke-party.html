@@ -351,9 +351,7 @@
     #debugPanel.active { display: flex; }
     #debugPanel button { font-size: 11px; padding: 5px 10px; cursor: pointer; border: none; border-radius: 4px; background: #333; color: #eee; }
     #debugPanel button:hover { background: #555; }
-    #wsStatus { font-size: 10px; color: #888; text-align: center; }
   </style>
-<script src="config.js"></script>
 </head>
 <body>
 
@@ -416,7 +414,6 @@
 
 <!-- DEBUG -->
 <div id="debugPanel">
-  <div id="wsStatus">⚪ SB Disconnected</div>
   <button onclick="fetch('/queue/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'Rhodylin',song:'Bohemian Rhapsody'})})">🎵 Add Rhodylin</button>
   <button onclick="fetch('/queue/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'emerome',song:'Don\u0027t Stop Believin\u0027'})})">🎵 Add emerome</button>
   <button onclick="fetch('/queue/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'Gloopdawg',song:'Mr. Brightside'})})">🎵 Add Gloopdawg</button>
@@ -555,56 +552,8 @@ function connectSSE() {
 }
 
 // ============================================================
-//  STREAMER.BOT — chat display only
-//  Mod queue commands (!add/!remove/!next/!clearq) are handled
-//  server-side in server.js via Twitch EventSub chat.message, same
-//  as !giveaway/!timer elsewhere in this project — this connection
-//  is purely for showing chat messages in the Tavern Chat panel.
-// ============================================================
-const KARAOKE_CONFIG = {
-  WS_URL:       (typeof CONFIG !== 'undefined' && CONFIG.streamerbotUrl) ? CONFIG.streamerbotUrl : 'ws://127.0.0.1:8080',
-  RECONNECT_MS: 5000,
-};
-
-let ws = null, wsRetry = null;
-
-function connectWS() {
-  if (ws) { ws.onclose = null; ws.close(); }
-  ws = new WebSocket(KARAOKE_CONFIG.WS_URL);
-  ws.onopen = () => {
-    setWsStatus('🟢 Connected');
-    clearTimeout(wsRetry);
-    ws.send(JSON.stringify({ request: 'Subscribe', id: 'nom-karaoke', events: { Twitch: ['ChatMessage'] } }));
-  };
-  ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch { return; } handleSB(m); };
-  ws.onerror   = () => setWsStatus('🔴 SB Error');
-  ws.onclose   = () => { setWsStatus('⚪ SB Disconnected'); wsRetry = setTimeout(connectWS, KARAOKE_CONFIG.RECONNECT_MS); };
-}
-
-function handleSB(msg) {
-  const src  = msg?.event?.source;
-  const type = msg?.event?.type;
-  if (src !== 'Twitch' || type !== 'ChatMessage') return;
-
-  const raw      = msg.data?.message?.message || '';
-  const username = msg.data?.message?.displayName || msg.data?.message?.username || 'Chatter';
-  const color    = msg.data?.message?.color || '#e8c040';
-
-  const text  = raw.trim();
-  const lower = text.toLowerCase();
-
-  // Show non-command messages in chat
-  const isCmd = lower.startsWith('!add') || lower.startsWith('!remove') ||
-                lower.startsWith('!kick') || lower === '!next' || lower === '!skip' ||
-                lower === '!clearq' || lower === '!clearqueue' ||
-                lower.startsWith('!q') || lower === '!dq' || lower === '!leave';
-  if (!isCmd) addChatMessage(username, text, color);
-}
-
-// ============================================================
 //  UTIL
 // ============================================================
-function setWsStatus(txt) { const el = document.getElementById('wsStatus'); if (el) el.textContent = txt; }
 function escHtml(str) { return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function scaleToFit() {
@@ -639,24 +588,33 @@ async function initKaraokeTheme() {
   } catch (e) {}
 }
 
-let themeSse;
-function connectThemeSSE() {
-  if (themeSse) themeSse.close();
-  themeSse = new EventSource('/alerts-stream');
-  themeSse.onmessage = (ev) => {
+// ============================================================
+//  MAIN ALERT BUS — theme switches + chat messages (Tavern Chat
+//  panel), straight from server.js's own Twitch EventSub connection.
+//  Mod queue commands (!add/!remove/!next/!clearq) are handled
+//  separately, server-side, same as !giveaway/!timer.
+// ============================================================
+let alertsSse;
+function connectAlertsSse() {
+  if (alertsSse) alertsSse.close();
+  alertsSse = new EventSource('/alerts-stream');
+  alertsSse.onmessage = (ev) => {
     try {
       const payload = JSON.parse(ev.data);
-      if (payload.type === 'theme-switch') applyKaraokeTheme(payload.theme);
+      if (payload.type === 'theme-switch') {
+        applyKaraokeTheme(payload.theme);
+      } else if (payload.type === 'chat-message' && payload.username && payload.text) {
+        addChatMessage(payload.username, payload.text, payload.color);
+      }
     } catch (e) {}
   };
-  themeSse.onerror = () => { themeSse.close(); setTimeout(connectThemeSSE, 3000); };
+  alertsSse.onerror = () => { alertsSse.close(); setTimeout(connectAlertsSse, 3000); };
 }
 
 initKaraokeTheme();
-connectThemeSSE();
+connectAlertsSse();
 
 connectSSE();
-connectWS();
 </script>
 </body>
 </html>
