@@ -687,6 +687,15 @@ function karaokeRemove(id) {
 
 function karaokeRemoveByUsername(username) {
   const lower = (username || '').trim().replace(/^@/, '').toLowerCase();
+
+  if (karaokeQueueState.nowSinging?.username === lower) {
+    console.log(`[karaoke] Removed ${karaokeQueueState.nowSinging.displayName} from the stage via chat command`);
+    karaokeQueueState.nowSinging = null;
+    saveKaraokeQueueState();
+    broadcastKaraokeQueue();
+    return true;
+  }
+
   const entry = karaokeQueueState.queue.find(e => e.username === lower);
   if (!entry) return false;
   console.log(`[karaoke] Removed ${entry.displayName} via chat command`);
