@@ -15,6 +15,7 @@ node_modules/
 .first-state.json
 .checkin-state.json
 .button-state.json
+.karaoke-queue-state.json
 
 npm-debug.log*
 *.log

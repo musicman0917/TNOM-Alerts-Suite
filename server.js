@@ -578,6 +578,142 @@ function buttonFillTemplate(outcome, username) {
   return outcome.replace(/%user%/gi, `@${username}`);
 }
 
+// ─── Karaoke Queue ───────────────────────────────────────────────────────────
+// A singer queue driven by mod chat commands (!add/!remove/!next/!clearq) and
+// the admin-karaoke.html panel, broadcast over its own SSE stream (shape:
+// { nowSinging, queue, settings }, no type wrapper — matches what
+// karaoke-party.html / karaoke-party-mobile.html / admin-karaoke.html expect).
+const KARAOKE_FILE = path.join(__dirname, '.karaoke-queue-state.json');
+const karaokeSseClients = new Set();
+
+let karaokeQueueState = {
+  nowSinging: null,          // { id, username, displayName, song, avatarUrl }
+  queue: [],                  // same shape, ordered — queue[0] sings next
+  settings: { maxSize: 10 },
+};
+let karaokeIdCounter = 1;
+
+function loadKaraokeQueueState() {
+  if (fs.existsSync(KARAOKE_FILE)) {
+    try {
+      const saved = JSON.parse(fs.readFileSync(KARAOKE_FILE, 'utf8'));
+      karaokeQueueState.nowSinging = saved.nowSinging ?? null;
+      karaokeQueueState.queue      = Array.isArray(saved.queue) ? saved.queue : [];
+      karaokeQueueState.settings   = { maxSize: 10, ...(saved.settings || {}) };
+      karaokeIdCounter = saved.idCounter || 1;
+    } catch (e) { console.log('[karaoke] Could not load state'); }
+  }
+}
+
+function saveKaraokeQueueState() {
+  fs.writeFileSync(KARAOKE_FILE, JSON.stringify({ ...karaokeQueueState, idCounter: karaokeIdCounter }, null, 2));
+}
+
+function broadcastKaraokeQueue() {
+  const data = `data: ${JSON.stringify(karaokeQueueState)}\n\n`;
+  for (const client of karaokeSseClients) {
+    try { client.write(data); } catch (e) { karaokeSseClients.delete(client); }
+  }
+}
+
+// Looks up a Twitch user's display name + avatar for a queue entry. Falls
+// back to the raw username with no avatar if the lookup fails — the admin
+// panel and overlays already render an initial-letter avatar for that case.
+async function karaokeLookupUser(username) {
+  try {
+    const token = await getValidToken();
+    if (!token) return { displayName: username, avatarUrl: null };
+    const res = await helixGet(`/helix/users?login=${encodeURIComponent(username)}`, token);
+    const user = res.body?.data?.[0];
+    if (!user) return { displayName: username, avatarUrl: null };
+    return { displayName: user.display_name || username, avatarUrl: user.profile_image_url || null };
+  } catch (e) {
+    return { displayName: username, avatarUrl: null };
+  }
+}
+
+async function karaokeAddToQueue(username, song) {
+  const clean = (username || '').trim().replace(/^@/, '');
+  if (!clean) return { success: false, error: 'No username provided' };
+  const lower = clean.toLowerCase();
+
+  if (karaokeQueueState.nowSinging?.username === lower) {
+    return { success: false, error: `${clean} is already singing` };
+  }
+  if (karaokeQueueState.queue.some(e => e.username === lower)) {
+    return { success: false, error: `${clean} is already in the queue` };
+  }
+  if (karaokeQueueState.queue.length >= karaokeQueueState.settings.maxSize) {
+    return { success: false, error: 'Queue is full' };
+  }
+
+  const { displayName, avatarUrl } = await karaokeLookupUser(clean);
+  const entry = {
+    id:       karaokeIdCounter++,
+    username: lower,
+    displayName,
+    song:     (song || '').trim().slice(0, 100),
+    avatarUrl,
+  };
+  karaokeQueueState.queue.push(entry);
+  saveKaraokeQueueState();
+  broadcastKaraokeQueue();
+  console.log(`[karaoke] Added ${displayName}${entry.song ? ` — "${entry.song}"` : ''}`);
+  return { success: true, entry };
+}
+
+function karaokeNext() {
+  karaokeQueueState.nowSinging = karaokeQueueState.queue.shift() || null;
+  saveKaraokeQueueState();
+  broadcastKaraokeQueue();
+  console.log(`[karaoke] Now singing: ${karaokeQueueState.nowSinging?.displayName || 'nobody'}`);
+}
+
+function karaokeClear() {
+  karaokeQueueState.nowSinging = null;
+  karaokeQueueState.queue = [];
+  saveKaraokeQueueState();
+  broadcastKaraokeQueue();
+  console.log('[karaoke] Queue cleared');
+}
+
+function karaokeRemove(id) {
+  const before = karaokeQueueState.queue.length;
+  karaokeQueueState.queue = karaokeQueueState.queue.filter(e => e.id !== id);
+  const removed = karaokeQueueState.queue.length !== before;
+  if (removed) { saveKaraokeQueueState(); broadcastKaraokeQueue(); }
+  return removed;
+}
+
+function karaokeRemoveByUsername(username) {
+  const lower = (username || '').trim().replace(/^@/, '').toLowerCase();
+  const entry = karaokeQueueState.queue.find(e => e.username === lower);
+  if (!entry) return false;
+  console.log(`[karaoke] Removed ${entry.displayName} via chat command`);
+  return karaokeRemove(entry.id);
+}
+
+function karaokeMove(id, direction) {
+  const idx = karaokeQueueState.queue.findIndex(e => e.id === id);
+  if (idx === -1) return false;
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= karaokeQueueState.queue.length) return false;
+  [karaokeQueueState.queue[idx], karaokeQueueState.queue[swapIdx]] =
+    [karaokeQueueState.queue[swapIdx], karaokeQueueState.queue[idx]];
+  saveKaraokeQueueState();
+  broadcastKaraokeQueue();
+  return true;
+}
+
+function karaokeSaveSettings(maxSize) {
+  const n = parseInt(maxSize, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 30) return false;
+  karaokeQueueState.settings.maxSize = n;
+  saveKaraokeQueueState();
+  broadcastKaraokeQueue();
+  return true;
+}
+
 // ─── "First!" Redemption ────────────────────────────────────────────────────
 // A Twitch custom reward that congratulates whoever redeems it — shows their
 // profile picture on the overlay and posts a chat message.
@@ -1486,6 +1622,47 @@ function routeTwitchEvent(subType, event) {
           modTimerCancel();
         }
         console.log(`[timer] !timer ${action} by ${event.chatter_user_name}`);
+        break;
+      }
+
+      // Mod/broadcaster commands: !add <user> [song] | !remove/!kick <user> | !next/!skip | !clearq/!clearqueue
+      if (text.startsWith('!add ')) {
+        if (!isChatMod(event)) {
+          console.log(`[karaoke] Ignored !add command from non-mod: ${event.chatter_user_name}`);
+          break;
+        }
+        const parts = rawText.slice('!add '.length).trim().split(/\s+/);
+        const user  = parts[0];
+        const song  = parts.slice(1).join(' ');
+        if (user) karaokeAddToQueue(user, song);
+        break;
+      }
+
+      if (text.startsWith('!remove ') || text.startsWith('!kick ')) {
+        if (!isChatMod(event)) {
+          console.log(`[karaoke] Ignored !remove/!kick command from non-mod: ${event.chatter_user_name}`);
+          break;
+        }
+        const target = rawText.trim().split(/\s+/)[1];
+        if (target) karaokeRemoveByUsername(target);
+        break;
+      }
+
+      if (text === '!next' || text === '!skip') {
+        if (!isChatMod(event)) {
+          console.log(`[karaoke] Ignored !next/!skip command from non-mod: ${event.chatter_user_name}`);
+          break;
+        }
+        karaokeNext();
+        break;
+      }
+
+      if (text === '!clearq' || text === '!clearqueue') {
+        if (!isChatMod(event)) {
+          console.log(`[karaoke] Ignored !clearq command from non-mod: ${event.chatter_user_name}`);
+          break;
+        }
+        karaokeClear();
         break;
       }
       break;
@@ -2439,6 +2616,118 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /queue/events (SSE) ──────────────────────────────────
+  if (pathname === '/queue/events') {
+    res.writeHead(200, {
+      'Content-Type':  'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection':    'keep-alive',
+    });
+    res.write(`data: ${JSON.stringify(karaokeQueueState)}\n\n`);
+    karaokeSseClients.add(res);
+    console.log(`[karaoke] SSE client connected — total: ${karaokeSseClients.size}`);
+    req.on('close', () => {
+      karaokeSseClients.delete(res);
+      console.log(`[karaoke] SSE client disconnected — total: ${karaokeSseClients.size}`);
+    });
+    return;
+  }
+
+  // ── GET /queue/state ─────────────────────────────────────────
+  if (pathname === '/queue/state') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(karaokeQueueState));
+    return;
+  }
+
+  // ── POST /queue/add ──────────────────────────────────────────
+  if (pathname === '/queue/add' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { username, song } = JSON.parse(body || '{}');
+        const result = await karaokeAddToQueue(username, song);
+        res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── POST /queue/next ─────────────────────────────────────────
+  if (pathname === '/queue/next' && req.method === 'POST') {
+    karaokeNext();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
+  // ── POST /queue/clear ────────────────────────────────────────
+  if (pathname === '/queue/clear' && req.method === 'POST') {
+    karaokeClear();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
+  // ── POST /queue/remove ───────────────────────────────────────
+  if (pathname === '/queue/remove' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { id } = JSON.parse(body || '{}');
+        const removed = karaokeRemove(id);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: removed }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── POST /queue/move ─────────────────────────────────────────
+  if (pathname === '/queue/move' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { id, direction } = JSON.parse(body || '{}');
+        const moved = karaokeMove(id, direction);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: moved }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── POST /queue/settings ─────────────────────────────────────
+  if (pathname === '/queue/settings' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { maxSize } = JSON.parse(body || '{}');
+        const ok = karaokeSaveSettings(maxSize);
+        res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(ok ? { success: true } : { success: false, error: 'Invalid max size (must be 1-30)' }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
   // ── Static files ───────────────────────────────────────────
   // Serve nom-alerts.html, config.js, Assets/, etc. from the same directory
   const MIME = {
@@ -2454,6 +2743,10 @@ const server = http.createServer(async (req, res) => {
     '.wav':  'audio/wav',
     '.ogg':  'audio/ogg',
     '.ico':  'image/x-icon',
+    '.ttf':   'font/ttf',
+    '.woff':  'font/woff',
+    '.woff2': 'font/woff2',
+    '.svg':   'image/svg+xml',
   };
 
   // Sanitize path to prevent directory traversal
@@ -2492,6 +2785,7 @@ loadWheelState();
 loadFirstState();
 loadCheckinState();
 loadButtonState();
+loadKaraokeQueueState();
 loadIntegrations();
 loadModTimerState();
 server.listen(PORT, '0.0.0.0', () => {

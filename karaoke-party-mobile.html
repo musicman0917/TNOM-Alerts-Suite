@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Karaoke Party Mobile – NeighborhoodofMusic</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    @font-face { font-family: 'Ringbearer'; src: url('ringbearer.ttf') format('truetype'); }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --parchment:     #f2e3b8;
+      --parchment-mid: #e0c98a;
+      --ink:           #1e0f04;
+      --ink-mid:       #3d2010;
+      --wood-mid:      #5c2e10;
+      --gold:          #c8a030;
+      --gold-light:    #f0d060;
+      --crimson:       #8b1818;
+    }
+
+    html, body {
+      width: 1080px; height: 1920px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'IM Fell English', serif;
+      transform-origin: top left;
+    }
+
+    /* WOOD PLAQUE */
+    .wood-plaque {
+      position: relative;
+      background:
+        repeating-linear-gradient(176deg, rgba(0,0,0,0.08) 0px, transparent 2px, transparent 9px, rgba(255,200,140,0.035) 10px, transparent 12px),
+        linear-gradient(155deg, #6b3a1e, #3a1c08 50%, #5c2e10 80%, #2a1406);
+      border: 2px solid #1e0f04; border-radius: 4px;
+      box-shadow: inset 0 2px 0 rgba(255,210,150,0.10), inset 0 -4px 10px rgba(0,0,0,0.55), 2px 4px 10px rgba(0,0,0,0.55);
+      padding: 8px 28px; text-align: center; flex-shrink: 0; z-index: 5;
+    }
+    .wood-plaque::before, .wood-plaque::after {
+      content: ''; position: absolute; top: 7px;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #d8d8d8, #4a4e54 70%, #2a2c30);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    }
+    .wood-plaque::before { left: 10px; } .wood-plaque::after { right: 10px; }
+    .plaque-label {
+      font-family: 'Cinzel', serif; font-weight: 700;
+      font-size: 12px; letter-spacing: 4px; text-transform: uppercase;
+      background: linear-gradient(180deg, #fff3c8 0%, #e8c040 30%, #a8801c 65%, #6b4e10 100%);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    /* CAMERA FRAME */
+    /* ══════════════════════════════════════
+       TOP SECTION — singer queue
+    ══════════════════════════════════════ */
+    #top-section {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 272px;
+      background-color: #7a6038;
+      background-image: url('Assets/burlap.png');
+      background-repeat: no-repeat; background-size: cover;
+      border-bottom: 4px solid #1a0d04;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.70), inset 0 0 60px rgba(0,0,0,0.45);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px 14px;
+      z-index: 10;
+      overflow: hidden;
+    }
+
+    #top-section::after {
+      content: ''; position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 90% 25% at 50% 0%, rgba(255,220,160,0.10) 0%, transparent 100%),
+        radial-gradient(ellipse 90% 90% at 50% 50%, transparent 55%, rgba(0,0,0,0.35) 100%);
+      pointer-events: none; z-index: 20;
+    }
+
+    /* ── SINGER QUEUE ROW ── */
+    #queue-section { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; z-index: 5; flex: 1; }
+
+    #queue-row {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding: 14px 10px 12px;
+      scrollbar-width: none;
+      justify-content: center;
+      background: var(--parchment);
+      background-image:
+        linear-gradient(140deg, rgba(255,255,255,0.22) 0%, transparent 55%),
+        radial-gradient(ellipse 35% 30% at 88% 88%, rgba(120,80,30,0.18) 0%, transparent 100%);
+      border: 2px solid rgba(92,46,16,0.38); border-radius: 4px;
+      box-shadow: 2px 3px 12px rgba(0,0,0,0.42), inset 0 0 14px rgba(160,120,50,0.15);
+      position: relative;
+      min-height: 120px;
+      align-items: center;
+    }
+    #queue-row::-webkit-scrollbar { display: none; }
+
+    /* Gold thumbtack on queue row */
+    #queue-row::before {
+      content: ''; position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+      width: 13px; height: 13px;
+      background: radial-gradient(circle at 38% 35%, #e0d060, #806010);
+      border-radius: 50%; border: 1px solid rgba(0,0,0,0.25);
+      box-shadow: 1px 2px 5px rgba(0,0,0,0.50);
+    }
+
+    .queue-empty {
+      font-family: 'IM Fell English', serif; font-style: italic;
+      font-size: 14px; color: var(--ink-mid);
+      text-align: center; width: 100%;
+    }
+
+    /* Each singer card */
+    .singer-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+      width: 90px;
+      padding: 6px 4px;
+      border-radius: 6px;
+      animation: cardIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .singer-card.next-up {
+      background: rgba(200,160,48,0.18);
+      border: 1px solid rgba(200,160,48,0.35);
+    }
+    @keyframes cardIn { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    .card-num {
+      font-family: 'Cinzel', serif; font-weight: 700;
+      font-size: 11px; color: var(--crimson);
+    }
+    .singer-card.next-up .card-num { color: var(--gold); }
+
+    .card-avatar {
+      width: 54px; height: 54px; border-radius: 50%;
+      border: 2px solid var(--wood-mid); overflow: hidden;
+      filter: sepia(35%) contrast(1.05);
+      background: var(--parchment-mid);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .card-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .card-avatar-init { font-family: 'Cinzel', serif; font-weight: 700; font-size: 20px; color: var(--ink); }
+
+    .singer-card.next-up .card-avatar { border-color: rgba(200,160,48,0.6); width: 60px; height: 60px; }
+
+    .card-name {
+      font-family: 'Cinzel', serif; font-weight: 700;
+      font-size: 10px; color: var(--ink);
+      text-align: center; width: 100%;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .card-song {
+      font-family: 'IM Fell English', serif; font-style: italic;
+      font-size: 9px; color: var(--ink-mid);
+      text-align: center; width: 100%;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* ══════════════════════════════════════
+       NOW SINGING BAR
+    ══════════════════════════════════════ */
+    #now-singing-bar {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 80px;
+      background:
+        repeating-linear-gradient(176deg, rgba(0,0,0,0.08) 0px, transparent 2px, transparent 9px, rgba(255,200,140,0.035) 10px, transparent 12px),
+        linear-gradient(180deg, #4a2410 0%, #2e1606 55%, #3a1c08 80%, #1e0c04 100%);
+      border-top: 3px solid #1a0d04;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.60), inset 0 2px 0 rgba(255,210,150,0.08);
+      display: flex; align-items: center; gap: 14px;
+      padding: 0 24px;
+      z-index: 20;
+    }
+
+    #now-singing-bar::before, #now-singing-bar::after {
+      content: ''; position: absolute; top: 50%; transform: translateY(-50%);
+      width: 10px; height: 10px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #d8d8d8, #4a4e54 70%, #2a2c30);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    }
+    #now-singing-bar::before { left: 14px; } #now-singing-bar::after { right: 14px; }
+
+    .mic-icon { font-size: 26px; flex-shrink: 0; animation: micPulse 2.2s ease-in-out infinite; }
+    @keyframes micPulse {
+      0%,100% { filter: drop-shadow(0 0 4px rgba(200,160,48,0.25)); }
+      50%     { filter: drop-shadow(0 0 14px rgba(200,160,48,0.65)); }
+    }
+    .now-label {
+      font-family: 'Cinzel', serif; font-weight: 700;
+      font-size: 10px; letter-spacing: 4px; text-transform: uppercase;
+      background: linear-gradient(180deg, #fff3c8 0%, #e8c040 30%, #a8801c 65%, #6b4e10 100%);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .bar-divider { width: 2px; height: 42px; background: linear-gradient(180deg, transparent, rgba(200,160,48,0.45), transparent); flex-shrink: 0; }
+
+    .now-avatar-wrap {
+      width: 48px; height: 48px; border-radius: 50%;
+      border: 2px solid rgba(200,160,48,0.45); overflow: hidden; flex-shrink: 0;
+      filter: sepia(30%) contrast(1.05);
+      background: rgba(40,20,8,0.6);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .now-avatar-wrap img { width: 100%; height: 100%; object-fit: cover; }
+    .now-avatar-initial { font-family: 'Cinzel', serif; font-weight: 700; font-size: 18px; color: var(--gold); }
+
+    #now-name {
+      font-family: 'Ringbearer', 'Cinzel', serif; font-size: 24px;
+      background: linear-gradient(180deg, #fff6d8 0%, #f0d060 22%, #c8a030 55%, #8b6010 80%, #c8a030 100%);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 340px; flex-shrink: 0;
+    }
+    #now-song {
+      font-family: 'IM Fell English', serif; font-style: italic; font-size: 16px;
+      color: rgba(235,200,130,0.68);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
+    }
+
+    /* Idle state */
+    #now-singing-bar.idle .mic-icon,
+    #now-singing-bar.idle .now-label,
+    #now-singing-bar.idle .bar-divider,
+    #now-singing-bar.idle .now-avatar-wrap,
+    #now-singing-bar.idle #now-song { display: none; }
+
+    #now-singing-bar.idle { padding: 0; }
+    #now-singing-bar.idle #now-name {
+      flex: 1; text-align: center;
+      max-width: none; font-size: 24px;
+    }
+
+    /* IRON BRACKETS (corners) */
+    .iron-bracket { position: absolute; width: 40px; height: 40px; z-index: 25; pointer-events: none; }
+    .iron-bracket svg { width: 100%; height: 100%; }
+    .bracket-tl { top: 8px;    left: 8px; }
+    .bracket-tr { top: 8px;    right: 8px;  transform: scaleX(-1); }
+    .bracket-bl { bottom: 92px; left: 8px;  transform: scaleY(-1); }
+    .bracket-br { bottom: 92px; right: 8px; transform: scale(-1,-1); }
+  </style>
+</head>
+<body>
+
+<!-- TOP SECTION: Singer Queue -->
+<div id="top-section">
+  <div id="queue-section">
+    <div class="wood-plaque"><div class="plaque-label">⊹ Singer Queue ⊹</div></div>
+    <div id="queue-row">
+      <div class="queue-empty" id="queue-empty"></div>
+    </div>
+  </div>
+</div>
+
+<!-- IRON BRACKETS -->
+<div class="iron-bracket bracket-tl"><svg viewBox="0 0 46 46"><path d="M2 2 L2 30 Q2 40 12 40 L40 40" fill="none" stroke="#3a3d42" stroke-width="7" stroke-linecap="round"/><path d="M2 2 L2 30 Q2 40 12 40 L40 40" fill="none" stroke="#8a8f96" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="6" r="3" fill="#9aa0a8" stroke="#2a2c30" stroke-width="1"/><circle cx="36" cy="40" r="3" fill="#9aa0a8" stroke="#2a2c30" stroke-width="1"/></svg></div>
+<div class="iron-bracket bracket-tr"><svg viewBox="0 0 46 46"><path d="M2 2 L2 30 Q2 40 12 40 L40 40" fill="none" stroke="#3a3d42" stroke-width="7" stroke-linecap="round"/><path d="M2 2 L2 30 Q2 40 12 40 L40 40" fill="none" stroke="#8a8f96" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="6" r="3" fill="#9aa0a8" stroke="#2a2c30" stroke-width="1"/><circle cx="36" cy="40" r="3" fill="#9aa0a8" stroke="#2a2c30" stroke-width="1"/></svg></div>
+<div class="iron-bracket bracket-bl"><svg viewBox="0 0 46 46"><path d="M2 2 L2 30 Q2 40 12 40 L40 40" fill="none" stroke="#3a3d42" stroke-width="7" stroke-linecap="round"/><path d="M2 2 L2 30 Q2 40 12 40 L40 40" fill="none" stroke="#8a8f96" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="6" r="3" fill="#9aa0a8" stroke="#2a2c30" stroke-width="1"/><circle cx="36" cy="40" r="3" fill="#9aa0a8" stroke="#2a2c30" stroke-width="1"/></svg></div>
+<div class="iron-bracket bracket-br"><svg viewBox="0 0 46 46"><path d="M2 2 L2 30 Q2 40 12 40 L40 40" fill="none" stroke="#3a3d42" stroke-width="7" stroke-linecap="round"/><path d="M2 2 L2 30 Q2 40 12 40 L40 40" fill="none" stroke="#8a8f96" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="6" r="3" fill="#9aa0a8" stroke="#2a2c30" stroke-width="1"/><circle cx="36" cy="40" r="3" fill="#9aa0a8" stroke="#2a2c30" stroke-width="1"/></svg></div>
+
+<!-- NOW SINGING BAR: anchored to bottom -->
+<div id="now-singing-bar" class="idle">
+  <span class="mic-icon">🎤</span>
+  <span class="now-label">Now Singing</span>
+  <div class="bar-divider"></div>
+  <div class="now-avatar-wrap" id="now-avatar-wrap">
+    <span class="now-avatar-initial" id="now-avatar-initial">?</span>
+  </div>
+  <span id="now-name">Welcome to the Neighborhood of Music!</span>
+  <span id="now-song"></span>
+</div>
+
+<script>
+// ── SSE: subscribe to server queue state ──
+let sse;
+function connectSSE() {
+  if (sse) sse.close();
+  sse = new EventSource('/queue/events');
+  sse.onmessage = (ev) => { try { renderAll(JSON.parse(ev.data)); } catch {} };
+  sse.onerror   = () => { sse.close(); setTimeout(connectSSE, 3000); };
+}
+
+// ── Render ──
+function renderAll(state) {
+  renderQueue(state.queue);
+  renderNowSinging(state.nowSinging, state.queue);
+}
+
+const AVATARS = [
+  `<svg viewBox="0 0 60 65" xmlns="http://www.w3.org/2000/svg"><ellipse cx="30" cy="34" rx="14" ry="18" fill="#1e0f04"/><polygon points="30,10 15,22 45,22" fill="#1e0f04"/><rect x="17" y="14" width="26" height="11" fill="#1e0f04" rx="1"/><path d="M16 50 Q20 42 30 40 Q40 42 44 50 L48 65 H12Z" fill="#1e0f04"/></svg>`,
+  `<svg viewBox="0 0 60 65" xmlns="http://www.w3.org/2000/svg"><ellipse cx="30" cy="30" rx="16" ry="18" fill="#2a2a2a"/><path d="M14 26 Q14 12 30 12 Q46 12 46 26" fill="#3a3a3a"/><rect x="14" y="26" width="32" height="10" fill="#2a2a2a" rx="2"/><path d="M16 48 Q20 40 30 38 Q40 40 44 48 L48 65 H12Z" fill="#2a2a2a"/></svg>`,
+  `<svg viewBox="0 0 60 65" xmlns="http://www.w3.org/2000/svg"><ellipse cx="30" cy="35" rx="13" ry="15" fill="#1e0f04"/><polygon points="30,5 19,28 41,28" fill="#2a1060"/><ellipse cx="30" cy="28" rx="14" ry="5" fill="#3a1880"/><path d="M17 50 Q21 42 30 40 Q39 42 43 50 L46 65 H14Z" fill="#1e0f04"/></svg>`,
+];
+
+function getAvatarFallback(username) {
+  let hash = 0;
+  for (const c of username) hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
+  return AVATARS[hash % AVATARS.length];
+}
+
+function renderQueue(queue) {
+  const row   = document.getElementById('queue-row');
+  const empty = document.getElementById('queue-empty');
+  Array.from(row.querySelectorAll('.singer-card')).forEach(el => el.remove());
+
+  if (queue.length === 0) {
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  queue.forEach((entry, i) => {
+    const card = document.createElement('div');
+    card.className = 'singer-card' + (i === 0 ? ' next-up' : '');
+
+    const initial = (entry.displayName || entry.username || '?')[0].toUpperCase();
+    const avatarHtml = entry.avatarUrl
+      ? `<img src="${esc(entry.avatarUrl)}" alt="">`
+      : `<span class="card-avatar-init">${esc(initial)}</span>`;
+
+    card.innerHTML = `
+      <span class="card-num">${i === 0 ? '🎤' : i + 1 + '.'}</span>
+      <div class="card-avatar">${avatarHtml}</div>
+      <div class="card-name">${esc(entry.displayName || entry.username)}</div>
+      ${entry.song ? `<div class="card-song">♪ ${esc(entry.song)}</div>` : ''}`;
+    row.appendChild(card);
+  });
+}
+
+function renderNowSinging(ns, queue) {
+  const bar      = document.getElementById('now-singing-bar');
+  const nameEl   = document.getElementById('now-name');
+  const songEl   = document.getElementById('now-song');
+  const avatarW  = document.getElementById('now-avatar-wrap');
+
+  if (ns) {
+    bar.classList.remove('idle');
+    nameEl.textContent = ns.displayName || ns.username;
+    songEl.textContent = ns.song ? `— ${ns.song}` : '';
+    const initial = (ns.displayName || ns.username || '?')[0].toUpperCase();
+    avatarW.innerHTML = ns.avatarUrl
+      ? `<img src="${esc(ns.avatarUrl)}" alt="">`
+      : `<span class="now-avatar-initial">${esc(initial)}</span>`;
+  } else {
+    bar.classList.add('idle');
+    nameEl.textContent = 'Welcome to the Neighborhood of Music!';
+    songEl.textContent = '';
+  }
+}
+
+function esc(str) {
+  return String(str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function scaleToFit() {
+  const scale = Math.min(window.innerWidth / 1080, window.innerHeight / 1920);
+  document.body.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', scaleToFit);
+scaleToFit();
+
+connectSSE();
+</script>
+</body>
+</html>

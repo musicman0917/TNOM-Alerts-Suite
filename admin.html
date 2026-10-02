@@ -198,6 +198,274 @@
     border-top: 1px solid #B8782022;
     margin: 14px 0;
   }
+
+  /* ── Tab bar ── */
+  .tab-bar {
+    display: flex;
+    gap: 8px;
+    margin: 0 0 16px;
+  }
+  .tab-btn {
+    background: rgba(0,0,0,.3);
+    border: 1px solid #B8782044;
+    border-radius: 4px;
+    color: var(--dark-muted);
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 8px 18px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .tab-btn:hover { color: var(--cream); border-color: var(--amber); }
+  .tab-btn.active {
+    color: var(--amber);
+    border-color: var(--amber);
+    background: rgba(232,144,16,.1);
+  }
+
+  /* ── Karaoke tab (scoped — ported from admin-karaoke.html) ── */
+  .tab-karaoke {
+    --bg:        #0f0a05;
+    --surface:   #1c1208;
+    --surface2:  #271a0c;
+    --border:    #3d2810;
+    --gold:      #c8a030;
+    --gold-l:    #f0d060;
+    --parch:     #f2e3b8;
+    --parch-mid: #e0c98a;
+    --ink:       #1e0f04;
+    --crimson:   #8b1818;
+    --green:     #2a6a30;
+    --text:      #e8d8b0;
+    --text-dim:  #8a7050;
+    --radius:    8px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    padding: 20px;
+    border-radius: 8px;
+  }
+
+  .tab-karaoke .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab-karaoke .header-title {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(180deg, #fff3c8 0%, #e8c040 40%, #a8801c 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  .tab-karaoke .header-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .tab-karaoke .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #555;
+    transition: background 0.3s;
+  }
+  .tab-karaoke .status-dot.connected { background: #40a060; box-shadow: 0 0 6px #40a060; }
+  .tab-karaoke .status-dot.error     { background: #a04040; }
+
+  .tab-karaoke .queue-count {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    color: var(--gold);
+    background: var(--surface2);
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  .tab-karaoke .grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .tab-karaoke .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+
+  .tab-karaoke .card-title {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab-karaoke #now-singing-card {
+    background: linear-gradient(135deg, var(--surface2), var(--surface));
+    border-color: rgba(200,160,48,0.30);
+  }
+
+  .tab-karaoke .now-singer {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .tab-karaoke .now-avatar {
+    width: 56px; height: 56px; border-radius: 50%;
+    border: 2px solid rgba(200,160,48,0.35);
+    overflow: hidden; flex-shrink: 0;
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tab-karaoke .now-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .tab-karaoke .now-avatar-init { font-family: 'Cinzel', serif; font-size: 22px; color: var(--gold); font-weight: 700; }
+
+  .tab-karaoke .now-info { flex: 1; min-width: 0; }
+  .tab-karaoke .now-display-name { font-family: 'Cinzel', serif; font-weight: 700; font-size: 18px; color: var(--gold-l); }
+  .tab-karaoke .now-display-song { font-size: 13px; color: var(--text-dim); margin-top: 3px; font-style: italic; }
+  .tab-karaoke .now-empty { color: var(--text-dim); font-style: italic; font-size: 14px; padding: 8px 0; }
+
+  .tab-karaoke .now-actions { display: flex; gap: 8px; margin-top: 14px; }
+
+  .tab-karaoke .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px; padding: 8px 16px;
+    border: none; border-radius: 6px;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .tab-karaoke .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .tab-karaoke .btn-gold {
+    background: linear-gradient(135deg, #8b6010, #c8a030);
+    color: #fff8e0;
+    box-shadow: 0 2px 8px rgba(200,160,48,0.25);
+  }
+  .tab-karaoke .btn-gold:hover:not(:disabled) { background: linear-gradient(135deg, #a07018, #e0b840); }
+
+  .tab-karaoke .btn-green {
+    background: linear-gradient(135deg, #1a4a20, #2a7030);
+    color: #90d890;
+  }
+  .tab-karaoke .btn-green:hover:not(:disabled) { background: linear-gradient(135deg, #206030, #30904a); }
+
+  .tab-karaoke .btn-red {
+    background: linear-gradient(135deg, #4a1010, #701818);
+    color: #f09090;
+  }
+  .tab-karaoke .btn-red:hover:not(:disabled) { background: linear-gradient(135deg, #601818, #902020); }
+
+  .tab-karaoke .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .tab-karaoke .btn-ghost:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+
+  .tab-karaoke .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 5px; }
+  .tab-karaoke .btn-icon { padding: 6px 8px; }
+
+  .tab-karaoke .add-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    align-items: start;
+  }
+
+  .tab-karaoke .field-wrap { display: flex; flex-direction: column; gap: 4px; }
+  .tab-karaoke .field-label { font-size: 11px; color: var(--text-dim); font-weight: 500; letter-spacing: 0.5px; }
+
+  .tab-karaoke input[type="text"], .tab-karaoke input[type="number"] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    width: 100%;
+    transition: border-color 0.15s;
+  }
+  .tab-karaoke input[type="text"]:focus, .tab-karaoke input[type="number"]:focus {
+    outline: none;
+    border-color: var(--gold);
+  }
+  .tab-karaoke input[type="text"]::placeholder { color: var(--text-dim); }
+
+  .tab-karaoke .add-error { font-size: 11px; color: #f08080; margin-top: 4px; min-height: 16px; }
+
+  .tab-karaoke #queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .tab-karaoke .queue-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    transition: border-color 0.15s;
+  }
+  .tab-karaoke .queue-row:hover { border-color: rgba(200,160,48,0.35); }
+  .tab-karaoke .queue-row.next-up { border-color: rgba(200,160,48,0.45); background: rgba(200,160,48,0.06); }
+
+  .tab-karaoke .row-num { font-family: 'Cinzel', serif; font-weight: 700; font-size: 13px; color: var(--crimson); width: 22px; text-align: right; flex-shrink: 0; }
+  .tab-karaoke .queue-row.next-up .row-num { color: var(--gold); }
+
+  .tab-karaoke .row-avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: 1px solid var(--border); overflow: hidden; flex-shrink: 0;
+    background: var(--surface); display: flex; align-items: center; justify-content: center;
+  }
+  .tab-karaoke .row-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .tab-karaoke .row-avatar-init { font-family: 'Cinzel', serif; font-weight: 700; font-size: 15px; color: var(--gold); }
+
+  .tab-karaoke .row-info { flex: 1; min-width: 0; }
+  .tab-karaoke .row-name { font-family: 'Cinzel', serif; font-weight: 600; font-size: 13px; color: var(--parch-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tab-karaoke .row-song { font-size: 11px; color: var(--text-dim); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+
+  .tab-karaoke .row-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+  .tab-karaoke .queue-empty-msg { text-align: center; color: var(--text-dim); font-style: italic; padding: 24px; font-size: 13px; }
+
+  .tab-karaoke .settings-row { display: flex; align-items: center; gap: 10px; }
+  .tab-karaoke .settings-row input[type="number"] { width: 80px; }
+
+  #toast {
+    position: fixed; bottom: 20px; right: 20px;
+    background: #271a0c; border: 1px solid #3d2810;
+    border-radius: 8px; padding: 12px 18px;
+    font-size: 13px; font-weight: 500;
+    opacity: 0; transform: translateY(8px);
+    transition: all 0.25s; pointer-events: none;
+    z-index: 100;
+    font-family: 'Inter', sans-serif;
+    color: #e8d8b0;
+  }
+  #toast.visible { opacity: 1; transform: translateY(0); }
+  #toast.success { border-color: #2a6a30; color: #90d890; }
+  #toast.error   { border-color: #6a1a1a; color: #f09090; }
 </style>
 <script src="config.js"></script>
 </head>
@@ -211,7 +479,12 @@
   </div>
 </header>
 
-<main>
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-btn-main"    onclick="switchAdminTab('main')">Main</button>
+  <button class="tab-btn"        id="tab-btn-karaoke" onclick="switchAdminTab('karaoke')">🎤 Karaoke</button>
+</div>
+
+<main id="tab-main">
 
   <!-- ── Panic Button ── -->
   <div class="panel full" style="border-color:#E03020;">
@@ -779,11 +1052,299 @@
 
 </main>
 
+<!-- ── Karaoke tab (hidden until selected — ported from admin-karaoke.html) ── -->
+<div id="tab-karaoke" class="tab-karaoke" style="display:none;">
+
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:24px;">🎤</span>
+      <span class="header-title">Karaoke Queue Admin</span>
+    </div>
+    <div class="header-status">
+      <div class="status-dot" id="kq-sse-dot"></div>
+      <span id="kq-sse-label" style="font-size:12px;color:var(--text-dim);">Connecting...</span>
+      <div class="queue-count"><span id="kq-queue-count-label">0</span> / <span id="kq-max-size-label">10</span> in queue</div>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- LEFT: Main content -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- NOW SINGING -->
+      <div class="card" id="now-singing-card">
+        <div class="card-title">🎤 Now Singing</div>
+        <div id="kq-now-singer-wrap">
+          <div class="now-empty">No one is singing right now.</div>
+        </div>
+        <div class="now-actions">
+          <button class="btn btn-gold" id="kq-btn-next" onclick="kqNextSinger()">⏭ Next Singer</button>
+          <button class="btn btn-red btn-sm" onclick="kqClearAll()">🗑 Clear All</button>
+        </div>
+      </div>
+
+      <!-- ADD TO QUEUE -->
+      <div class="card">
+        <div class="card-title">➕ Add to Queue</div>
+        <div class="add-form">
+          <div class="field-wrap">
+            <label class="field-label">Twitch Username</label>
+            <input type="text" id="kq-add-username" placeholder="e.g. Rhodylin" autocomplete="off" onkeydown="if(event.key==='Enter')kqAddToQueue()">
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">Song Title (optional)</label>
+            <input type="text" id="kq-add-song" placeholder="e.g. Bohemian Rhapsody" autocomplete="off" onkeydown="if(event.key==='Enter')kqAddToQueue()">
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">&nbsp;</label>
+            <button class="btn btn-green" id="kq-btn-add" onclick="kqAddToQueue()">Add</button>
+          </div>
+        </div>
+        <div class="add-error" id="kq-add-error"></div>
+      </div>
+
+      <!-- QUEUE -->
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>📜 Queue</span>
+          <span id="kq-queue-count-sub" style="font-size:10px;color:var(--text-dim);letter-spacing:1px;font-family:'Inter';font-weight:500;">0 people</span>
+        </div>
+        <div id="queue-list">
+          <div class="queue-empty-msg">No one in the queue yet.</div>
+        </div>
+      </div>
+
+    </div><!-- /left -->
+
+    <!-- RIGHT: Sidebar -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- SETTINGS -->
+      <div class="card">
+        <div class="card-title">⚙ Settings</div>
+        <div class="field-wrap" style="margin-bottom:12px;">
+          <label class="field-label">Max Queue Size</label>
+          <div class="settings-row">
+            <input type="number" id="kq-setting-maxsize" min="1" max="30" value="10">
+            <button class="btn btn-ghost btn-sm" onclick="kqSaveSettings()">Save</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);line-height:1.6;">
+          <strong style="color:var(--text);">Mod chat commands:</strong><br>
+          <code style="color:var(--gold-l);">!add username [song]</code> — add to queue<br>
+          <code style="color:var(--gold-l);">!remove username</code> — remove from queue<br>
+          <code style="color:var(--gold-l);">!next</code> — advance queue<br>
+          <code style="color:var(--gold-l);">!clearq</code> — clear all
+        </div>
+      </div>
+
+      <!-- QUICK ACTIONS -->
+      <div class="card">
+        <div class="card-title">⚡ Quick Actions</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="btn btn-gold" onclick="kqNextSinger()" style="width:100%;">⏭ Next Singer</button>
+          <button class="btn btn-red btn-sm" onclick="kqClearAll()" style="width:100%;">🗑 Clear Entire Queue</button>
+        </div>
+      </div>
+
+    </div><!-- /sidebar -->
+
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
 <script>
 // ─── Shared overlay URL ─────────────────────────────────────────────────────
 const OVERLAY_URL = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
   ? CONFIG.tokenBrokerUrl.replace('/token', '')
   : 'http://192.168.6.228:3010';
+
+// ─── Admin tabs ──────────────────────────────────────────────────────────────
+function switchAdminTab(name) {
+  document.getElementById('tab-main').style.display    = name === 'main'    ? '' : 'none';
+  document.getElementById('tab-karaoke').style.display  = name === 'karaoke' ? '' : 'none';
+  document.getElementById('tab-btn-main').classList.toggle('active',    name === 'main');
+  document.getElementById('tab-btn-karaoke').classList.toggle('active', name === 'karaoke');
+}
+
+// ─── Karaoke Queue ────────────────────────────────────────────────────────────
+let kqCurrentState = { nowSinging: null, queue: [], settings: { maxSize: 10 } };
+
+let kqSse;
+function kqConnectSSE() {
+  if (kqSse) kqSse.close();
+  kqSse = new EventSource(`${OVERLAY_URL}/queue/events`);
+  kqSse.onopen = () => {
+    document.getElementById('kq-sse-dot').className     = 'status-dot connected';
+    document.getElementById('kq-sse-label').textContent = 'Live';
+  };
+  kqSse.onmessage = (ev) => {
+    try {
+      kqCurrentState = JSON.parse(ev.data);
+      kqRenderAll(kqCurrentState);
+    } catch {}
+  };
+  kqSse.onerror = () => {
+    document.getElementById('kq-sse-dot').className     = 'status-dot error';
+    document.getElementById('kq-sse-label').textContent = 'Reconnecting...';
+    kqSse.close();
+    setTimeout(kqConnectSSE, 3000);
+  };
+}
+
+function kqRenderAll(state) {
+  kqRenderNowSinging(state.nowSinging);
+  kqRenderQueue(state.queue);
+  kqRenderSettings(state.settings);
+}
+
+function kqRenderNowSinging(ns) {
+  const wrap = document.getElementById('kq-now-singer-wrap');
+  if (!ns) {
+    wrap.innerHTML = '<div class="now-empty">No one is singing right now.</div>';
+    return;
+  }
+  const initial = (ns.displayName || ns.username || '?')[0].toUpperCase();
+  const avatarHtml = ns.avatarUrl
+    ? `<img src="${kqEsc(ns.avatarUrl)}" alt="">`
+    : `<span class="now-avatar-init">${kqEsc(initial)}</span>`;
+
+  wrap.innerHTML = `
+    <div class="now-singer">
+      <div class="now-avatar">${avatarHtml}</div>
+      <div class="now-info">
+        <div class="now-display-name">${kqEsc(ns.displayName || ns.username)}</div>
+        ${ns.song ? `<div class="now-display-song">♪ ${kqEsc(ns.song)}</div>` : '<div class="now-display-song" style="color:var(--text-dim)">No song specified</div>'}
+      </div>
+    </div>`;
+}
+
+function kqRenderQueue(queue) {
+  const list      = document.getElementById('queue-list');
+  const countSub  = document.getElementById('kq-queue-count-sub');
+  const countMain = document.getElementById('kq-queue-count-label');
+  const maxLabel  = document.getElementById('kq-max-size-label');
+
+  countSub.textContent  = `${queue.length} ${queue.length === 1 ? 'person' : 'people'}`;
+  countMain.textContent = queue.length;
+  maxLabel.textContent  = kqCurrentState.settings?.maxSize ?? 10;
+
+  if (queue.length === 0) {
+    list.innerHTML = '<div class="queue-empty-msg">No one in the queue yet.</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  queue.forEach((entry, i) => {
+    const initial = (entry.displayName || entry.username || '?')[0].toUpperCase();
+    const avatarHtml = entry.avatarUrl
+      ? `<img src="${kqEsc(entry.avatarUrl)}" alt="">`
+      : `<span class="row-avatar-init">${kqEsc(initial)}</span>`;
+
+    const row = document.createElement('div');
+    row.className = 'queue-row' + (i === 0 ? ' next-up' : '');
+    row.innerHTML = `
+      <span class="row-num">${i + 1}.</span>
+      <div class="row-avatar">${avatarHtml}</div>
+      <div class="row-info">
+        <div class="row-name">${kqEsc(entry.displayName || entry.username)}</div>
+        ${entry.song ? `<div class="row-song">♪ ${kqEsc(entry.song)}</div>` : ''}
+      </div>
+      <div class="row-actions">
+        <button class="btn btn-ghost btn-sm btn-icon" title="Move Up"    onclick="kqMove(${entry.id},'up')"   ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="btn btn-ghost btn-sm btn-icon" title="Move Down"  onclick="kqMove(${entry.id},'down')" ${i === queue.length-1 ? 'disabled' : ''}>↓</button>
+        <button class="btn btn-red btn-sm btn-icon"   title="Remove"     onclick="kqRemove(${entry.id})">✕</button>
+      </div>`;
+    list.appendChild(row);
+  });
+}
+
+function kqRenderSettings(settings) {
+  const input = document.getElementById('kq-setting-maxsize');
+  if (settings?.maxSize) input.value = settings.maxSize;
+}
+
+async function kqAddToQueue() {
+  const usernameInput = document.getElementById('kq-add-username');
+  const songInput     = document.getElementById('kq-add-song');
+  const errorEl       = document.getElementById('kq-add-error');
+  const btn           = document.getElementById('kq-btn-add');
+
+  const username = usernameInput.value.trim();
+  const song     = songInput.value.trim();
+  errorEl.textContent = '';
+
+  if (!username) { errorEl.textContent = 'Please enter a Twitch username.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Adding...';
+
+  try {
+    const r = await fetch(`${OVERLAY_URL}/queue/add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, song }),
+    });
+    const data = await r.json();
+    if (data.success) {
+      usernameInput.value = '';
+      songInput.value = '';
+      kqShowToast(`${data.entry.displayName} added to queue!`, 'success');
+    } else {
+      errorEl.textContent = data.error || 'Could not add to queue.';
+    }
+  } catch {
+    errorEl.textContent = 'Server error.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Add';
+  }
+}
+
+async function kqNextSinger() {
+  await fetch(`${OVERLAY_URL}/queue/next`, { method: 'POST' });
+  kqShowToast('Advanced to next singer', 'success');
+}
+
+async function kqClearAll() {
+  if (!confirm('Clear the entire queue and current singer?')) return;
+  await fetch(`${OVERLAY_URL}/queue/clear`, { method: 'POST' });
+  kqShowToast('Queue cleared', 'success');
+}
+
+async function kqRemove(id) {
+  await fetch(`${OVERLAY_URL}/queue/remove`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+}
+
+async function kqMove(id, direction) {
+  await fetch(`${OVERLAY_URL}/queue/move`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, direction }) });
+}
+
+async function kqSaveSettings() {
+  const maxSize = parseInt(document.getElementById('kq-setting-maxsize').value, 10);
+  const r = await fetch(`${OVERLAY_URL}/queue/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ maxSize }) });
+  const data = await r.json();
+  if (data.success) kqShowToast('Settings saved', 'success');
+  else kqShowToast(data.error || 'Could not save', 'error');
+}
+
+let kqToastTimer;
+function kqShowToast(msg, type = 'success') {
+  clearTimeout(kqToastTimer);
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `visible ${type}`;
+  kqToastTimer = setTimeout(() => t.className = '', 3000);
+}
+
+function kqEsc(str) {
+  return String(str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+kqConnectSSE();
 
 // ─── Log ───────────────────────────────────────────────────────────────────
 function addLog(msg, type = '') {
