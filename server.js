@@ -1676,12 +1676,15 @@ function routeTwitchEvent(subType, event) {
         break;
       }
 
-      // Viewer command — anyone can ask who's currently singing.
+      // Viewer command — anyone can ask who's currently singing. Also drops
+      // their Twitch link in chat and fires an on-screen shoutout, since the
+      // current singer is usually a fellow streamer worth plugging.
       if (text === '!singer') {
         if (karaokeQueueState.nowSinging) {
-          const { displayName, song } = karaokeQueueState.nowSinging;
+          const { username, displayName, song } = karaokeQueueState.nowSinging;
           const songNote = song ? ` — singing "${song}"` : '';
-          sendChatMessage(`🎤 Now singing: ${displayName}${songNote}`);
+          sendChatMessage(`🎤 Now singing: ${displayName}${songNote} — https://twitch.tv/${username}`);
+          broadcastAlert({ type: 'shoutout', username, profileUrl: null, game: null });
         } else {
           sendChatMessage('🎤 Nobody is singing right now!');
         }
