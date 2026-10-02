@@ -1675,6 +1675,18 @@ function routeTwitchEvent(subType, event) {
         karaokeClear();
         break;
       }
+
+      // Viewer command — anyone can ask who's currently singing.
+      if (text === '!singer') {
+        if (karaokeQueueState.nowSinging) {
+          const { displayName, song } = karaokeQueueState.nowSinging;
+          const songNote = song ? ` — singing "${song}"` : '';
+          sendChatMessage(`🎤 Now singing: ${displayName}${songNote}`);
+        } else {
+          sendChatMessage('🎤 Nobody is singing right now!');
+        }
+        break;
+      }
       break;
     }
 
