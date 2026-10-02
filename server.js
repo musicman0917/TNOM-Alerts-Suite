@@ -1667,9 +1667,9 @@ function routeTwitchEvent(subType, event) {
         break;
       }
 
-      if (text === '!next' || text === '!skip') {
+      if (text === '!nextsinger' || text === '!skip') {
         if (!isChatMod(event)) {
-          console.log(`[karaoke] Ignored !next/!skip command from non-mod: ${event.chatter_user_name}`);
+          console.log(`[karaoke] Ignored !nextsinger/!skip command from non-mod: ${event.chatter_user_name}`);
           break;
         }
         karaokeNext();
