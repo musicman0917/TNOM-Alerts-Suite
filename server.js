@@ -1795,6 +1795,14 @@ function tierNum(tier) {
 
 let eventSubWs = null;
 let esReconnectMs = 2000;
+let esLastWas429 = false;
+
+// A 429 on the WS handshake means Twitch is actively rate-limiting new
+// connection attempts — climbing the normal 1.5x ladder from 2s still means
+// several more attempts within a few minutes, which can keep renewing the
+// penalty. Jump straight to a long fixed cooldown instead, and stay there
+// (no ladder growth) until a connection actually succeeds.
+const ES_RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000;
 
 function connectEventSub(customUrl) {
   const wsUrl = customUrl || EVENTSUB_URL;
@@ -1811,14 +1819,22 @@ function connectEventSub(customUrl) {
 
   eventSubWs = new WebSocket(wsUrl);
 
-  eventSubWs.on('open',    ()  => { esReconnectMs = 2000; console.log('[eventsub] Connected'); });
+  eventSubWs.on('open', () => {
+    esReconnectMs = 2000;
+    esLastWas429  = false;
+    console.log('[eventsub] Connected');
+  });
   eventSubWs.on('message', (d) => {
     try { handleEventSubMessage(JSON.parse(d.toString())); } catch (e) {}
   });
-  eventSubWs.on('error',   (e) => console.log('[eventsub] Error:', e.message));
-  eventSubWs.on('close',   (code) => {
-    console.log(`[eventsub] Closed (${code}) — reconnecting in ${esReconnectMs}ms`);
-    setTimeout(() => connectEventSub(), esReconnectMs);
+  eventSubWs.on('error', (e) => {
+    console.log('[eventsub] Error:', e.message);
+    esLastWas429 = /\b429\b/.test(e.message || '');
+  });
+  eventSubWs.on('close', (code) => {
+    const delay = esLastWas429 ? ES_RATE_LIMIT_COOLDOWN_MS : esReconnectMs;
+    console.log(`[eventsub] Closed (${code}) — reconnecting in ${delay}ms${esLastWas429 ? ' (rate-limited, long cooldown)' : ''}`);
+    setTimeout(() => connectEventSub(), delay);
     esReconnectMs = Math.min(esReconnectMs * 1.5, 60000);
   });
 }
