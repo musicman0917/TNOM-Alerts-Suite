@@ -3234,6 +3234,12 @@ function connectAlertBus() {
       return;
     }
 
+    // Raw chat messages — broadcast for the karaoke overlay's Tavern Chat
+    // panel, not an alert; this overlay has no use for them.
+    if (payload.type === 'chat-message') {
+      return;
+    }
+
     // Goal visibility toggle
     if (payload.type === 'goal-toggle') {
       const widget = document.getElementById('goal-widget');

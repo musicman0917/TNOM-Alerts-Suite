@@ -1511,6 +1511,7 @@ function connectAlertBus() {
     try { payload = JSON.parse(e.data); } catch { return; }
     if (payload.type === 'connected') { console.log('[alert bus] Connected ✓'); return; }
     if (payload.type === 'theme-switch') { applyTheme(payload.theme); return; }
+    if (payload.type === 'chat-message') { return; }
     if (payload.type === 'goal-update' && payload.goal) {
       Object.assign(swGoalState, payload.goal);
       updateGoalBar();
