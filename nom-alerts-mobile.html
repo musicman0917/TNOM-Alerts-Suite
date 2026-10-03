@@ -1561,8 +1561,13 @@ function connectAlertBus() {
       fireRaidOut(payload.username || 'Someone', payload.amount ?? null);
     } else if (payload.type === 'first') {
       fireFirst(payload.username || 'Someone', payload.congrats || null);
-    } else if (payload.type) {
+    } else if (payload.type && CONFIGS[payload.type]) {
       showAlert(payload.type, payload.username || 'Someone', payload.amount ?? null, payload.message ?? null, payload.goal ?? null);
+    } else if (payload.type) {
+      // Unrecognized type — ignore rather than fall back to CONFIGS.follow
+      // (renderAlert's `CONFIGS[type] || CONFIGS.follow` default), which
+      // used to render these as a bogus "new follower" alert.
+      console.log(`[alert bus] Ignored unrecognized alert type: ${payload.type}`);
     }
   };
 
