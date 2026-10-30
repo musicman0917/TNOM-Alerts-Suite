@@ -449,6 +449,11 @@ function renderChat() {
   });
 }
 
+function clearChat() {
+  chatMsgs = [];
+  renderChat();
+}
+
 // ============================================================
 //  QUEUE RENDER (driven by SSE state from server)
 // ============================================================
@@ -605,6 +610,8 @@ function connectAlertsSse() {
         applyKaraokeTheme(payload.theme);
       } else if (payload.type === 'chat-message' && payload.username && payload.text) {
         addChatMessage(payload.username, payload.text, payload.color);
+      } else if (payload.type === 'chat-clear') {
+        clearChat();
       }
     } catch (e) {}
   };

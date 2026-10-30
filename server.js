@@ -1507,6 +1507,7 @@ function eventsubSubscriptions(sessionId, broadcasterId) {
     { type: 'channel.goal.progress',       version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.goal.end',            version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'channel.chat.message',        version: '1', condition: { broadcaster_user_id: broadcasterId, user_id: broadcasterId } },
+    { type: 'channel.chat.clear',          version: '1', condition: { broadcaster_user_id: broadcasterId, user_id: broadcasterId } },
     { type: 'channel.ad_break.begin',      version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'stream.online',               version: '1', condition: { broadcaster_user_id: broadcasterId } },
     { type: 'stream.offline',              version: '1', condition: { broadcaster_user_id: broadcasterId } },
@@ -1932,6 +1933,13 @@ function routeTwitchEvent(subType, event) {
       }
       break;
     }
+
+    // Twitch mod/broadcaster ran /clear — wipe the karaoke overlay's Tavern
+    // Chat panel (and anything else listening) along with the real chat.
+    case 'channel.chat.clear':
+      broadcastAlert({ type: 'chat-clear' });
+      console.log('[chat] Cleared (/clear)');
+      break;
 
     case 'channel.ad_break.begin':
       broadcastAdBreak({
