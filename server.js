@@ -905,6 +905,14 @@ function loadModTimerState() {
   }
 }
 
+// Ephemeral, like the giveaway auto-close timer — lets the server actually
+// know when a timer finishes (previously only the overlay's client-side
+// countdown knew, so modTimerState stayed "active" forever after expiry).
+let modTimerExpiryHandle = null;
+function clearModTimerExpiry() {
+  if (modTimerExpiryHandle) { clearTimeout(modTimerExpiryHandle); modTimerExpiryHandle = null; }
+}
+
 function saveModTimerState() {
   fs.writeFileSync(MOD_TIMER_FILE, JSON.stringify(modTimerState, null, 2));
 }
@@ -938,13 +946,38 @@ function parseDurationToSeconds(input) {
   return found ? total : null;
 }
 
+// "5s", "2m", "1h 30m", "2h" — drops any unit that's zero, except seconds
+// when the whole duration is under a minute.
+function formatDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const parts = [];
+  if (h) parts.push(`${h}h`);
+  if (m) parts.push(`${m}m`);
+  if (s || parts.length === 0) parts.push(`${s}s`);
+  return parts.join(' ');
+}
+
 function modTimerStart(durationSeconds, label) {
+  clearModTimerExpiry();
   const seconds = Math.max(1, Math.round(durationSeconds));
   const endsAt  = new Date(Date.now() + seconds * 1000).toISOString();
   modTimerState = { active: true, label: (label || '').trim(), endsAt, durationSeconds: seconds };
   saveModTimerState();
   broadcastModTimer({ status: 'started', label: modTimerState.label, endsAt, durationSeconds: seconds });
+  sendChatMessage(`⏱️ Timer set for ${formatDuration(seconds)}${modTimerState.label ? `: ${modTimerState.label}` : ''}`);
   console.log(`[timer] Started — ${seconds}s${modTimerState.label ? ` "${modTimerState.label}"` : ''}`);
+
+  modTimerExpiryHandle = setTimeout(() => {
+    modTimerExpiryHandle = null;
+    const finishedLabel = modTimerState.label;
+    modTimerState = { active: false, label: '', endsAt: null, durationSeconds: null };
+    saveModTimerState();
+    broadcastModTimer({ status: 'cancelled' });
+    sendChatMessage(`⏱️ Time's up!${finishedLabel ? ` ${finishedLabel}` : ''}`);
+    console.log('[timer] Expired naturally');
+  }, seconds * 1000);
 }
 
 // Parses a raw duration string (from chat or the admin form) and starts the
@@ -957,9 +990,12 @@ function modTimerSetFromInput(durationStr, label) {
 }
 
 function modTimerCancel() {
+  clearModTimerExpiry();
+  const wasActive = modTimerState.active;
   modTimerState = { active: false, label: '', endsAt: null, durationSeconds: null };
   saveModTimerState();
   broadcastModTimer({ status: 'cancelled' });
+  if (wasActive) sendChatMessage('⏱️ Timer cancelled!');
   console.log('[timer] Cancelled');
 }
 
