@@ -2644,6 +2644,24 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── POST /giveaway-remove ───────────────────────────────────
+  if (pathname === '/giveaway-remove' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { username } = JSON.parse(body || '{}');
+        const removed = giveawayRemoveEntrant(username);
+        res.writeHead(removed ? 200 : 404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(removed ? { ok: true, giveaway: giveawayState } : { error: `${username} is not entered` }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   // ── GET /wheel-state ────────────────────────────────────────
   if (pathname === '/wheel-state') {
     res.writeHead(200, { 'Content-Type': 'application/json' });

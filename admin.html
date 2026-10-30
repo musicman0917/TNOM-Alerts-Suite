@@ -1159,6 +1159,8 @@
       <span id="giveaway-winner-display" style="color:var(--amber);"></span>
     </div>
 
+    <div id="giveaway-entries-list" style="max-height:220px;overflow-y:auto;margin-top:8px;display:flex;flex-direction:column;gap:4px;"></div>
+
     <hr>
     <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--amber);margin-bottom:12px;">Discord Webhook (winner announcements)</div>
     <div style="display:grid;grid-template-columns:3fr 1fr;gap:12px;align-items:end;">
@@ -2505,7 +2507,36 @@ async function fetchGiveawayState() {
       data.active ? 'Collecting entries' : (data.winner ? 'Drawn' : 'Idle');
     document.getElementById('giveaway-winner-display').textContent =
       data.winner ? `🏆 ${data.winner.username}` : '';
+
+    const list = document.getElementById('giveaway-entries-list');
+    const entries = data.entries || [];
+    list.innerHTML = entries.length
+      ? entries.map(e => `
+        <div class="token-row" style="justify-content:space-between;padding:4px 8px;background:rgba(0,0,0,0.2);border-radius:3px;">
+          <span style="font-size:12px;">${kqEsc(e.username)}</span>
+          <button onclick="removeGiveawayEntrant('${kqEsc(e.username)}')" class="danger" style="padding:2px 8px;font-size:10px;">✕</button>
+        </div>`).join('')
+      : '<div style="font-size:11px;color:var(--dark-muted);font-style:italic;">No entries yet</div>';
   } catch (e) {}
+}
+
+async function removeGiveawayEntrant(username) {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/giveaway-remove`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ username }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      addLog(`Removed entrant: ${username}`, 'ok');
+      fetchGiveawayState();
+    } else {
+      addLog(`Remove entrant failed: ${data.error || 'unknown error'}`, 'warn');
+    }
+  } catch (e) {
+    addLog(`Remove entrant error: ${e.message}`, 'error');
+  }
 }
 
 async function saveDiscordWebhook() {
