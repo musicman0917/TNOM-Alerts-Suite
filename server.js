@@ -297,6 +297,8 @@ let giveawayState = {
   keyword: '!enter',
   entries: [],          // [{ userId, username }]
   winner:  null,         // { userId, username } | null
+  timerEnabled: false,   // auto-close entries N minutes after start, if on
+  timerMinutes: 5,
 };
 
 function loadGiveawayState() {
@@ -317,20 +319,42 @@ function broadcastGiveaway(payload) {
   }
 }
 
+// Auto-close timer — ephemeral (not persisted), same tradeoff as the OAuth
+// refresh timers: doesn't survive a server restart mid-giveaway, but a mod
+// can always close entries manually if that happens.
+let giveawayTimerHandle = null;
+function clearGiveawayTimer() {
+  if (giveawayTimerHandle) { clearTimeout(giveawayTimerHandle); giveawayTimerHandle = null; }
+}
+
 // Shared giveaway actions — called from both the admin HTTP endpoints and
 // the !giveaway chat commands, so both surfaces always behave identically.
 function giveawayStart(keyword) {
+  clearGiveawayTimer();
   giveawayState.active  = true;
   giveawayState.keyword = (keyword && keyword.trim()) || '!enter';
   giveawayState.entries = [];
   giveawayState.winner  = null;
   saveGiveawayState();
-  broadcastGiveaway({ status: 'started', keyword: giveawayState.keyword, count: 0, entries: [] });
+
+  let endsAt = null;
+  if (giveawayState.timerEnabled && giveawayState.timerMinutes > 0) {
+    const ms = giveawayState.timerMinutes * 60000;
+    endsAt = new Date(Date.now() + ms).toISOString();
+    giveawayTimerHandle = setTimeout(() => {
+      giveawayTimerHandle = null;
+      console.log('[giveaway] Auto-closing entries — timer expired');
+      giveawayCloseEntries();
+    }, ms);
+  }
+
+  broadcastGiveaway({ status: 'started', keyword: giveawayState.keyword, count: 0, entries: [], endsAt });
   sendChatMessage(`🎉 Giveaway started! Type ${giveawayState.keyword} in chat to enter!`);
-  console.log(`[giveaway] Started — keyword: ${giveawayState.keyword}`);
+  console.log(`[giveaway] Started — keyword: ${giveawayState.keyword}${endsAt ? `, auto-closing in ${giveawayState.timerMinutes}m` : ''}`);
 }
 
 function giveawayCloseEntries() {
+  clearGiveawayTimer();
   giveawayState.active = false;
   saveGiveawayState();
   broadcastGiveaway({ status: 'stopped', keyword: giveawayState.keyword, count: giveawayState.entries.length, entries: giveawayState.entries.map(e => e.username) });
@@ -338,8 +362,19 @@ function giveawayCloseEntries() {
   console.log(`[giveaway] Entries closed — ${giveawayState.entries.length} total`);
 }
 
+function giveawaySetTimerSettings(enabled, minutes) {
+  giveawayState.timerEnabled = !!enabled;
+  if (minutes != null) {
+    const n = parseFloat(minutes);
+    if (n > 0) giveawayState.timerMinutes = n;
+  }
+  saveGiveawayState();
+  console.log(`[giveaway] Timer settings: ${giveawayState.timerEnabled ? 'ON' : 'OFF'}, ${giveawayState.timerMinutes}m`);
+}
+
 function giveawayDraw() {
   if (!giveawayState.entries.length) return null;
+  clearGiveawayTimer();
   const winner     = giveawayState.entries[Math.floor(Math.random() * giveawayState.entries.length)];
   const entryCount = giveawayState.entries.length;
   giveawayState.active = false;
@@ -363,6 +398,7 @@ function giveawayDraw() {
 }
 
 function giveawayReset() {
+  clearGiveawayTimer();
   giveawayState.active  = false;
   giveawayState.entries = [];
   giveawayState.winner  = null;
@@ -2638,6 +2674,24 @@ const server = http.createServer(async (req, res) => {
     giveawayReset();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  // ── POST /giveaway-timer-settings ───────────────────────────
+  if (pathname === '/giveaway-timer-settings' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { enabled, minutes } = JSON.parse(body || '{}');
+        giveawaySetTimerSettings(enabled, minutes);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, giveaway: giveawayState }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
     return;
   }
 

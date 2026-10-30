@@ -1144,6 +1144,13 @@
       <button onclick="resetGiveaway()" class="danger" style="flex:1;padding:10px;">↺ Reset</button>
     </div>
 
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px;background:rgba(0,0,0,0.2);border-radius:3px;">
+      <input type="checkbox" id="giveaway-timer-enabled" style="width:16px;height:16px;cursor:pointer;" onchange="saveGiveawayTimerSettings()">
+      <label for="giveaway-timer-enabled" style="font-size:12px;cursor:pointer;flex:1;">Auto-close entries after</label>
+      <input id="giveaway-timer-minutes" type="number" min="1" step="1" value="5" style="width:60px;background:rgba(0,0,0,.4);border:1px solid #B8782044;border-radius:3px;color:var(--cream);font-family:'Crimson Pro',serif;font-size:14px;padding:8px 10px;outline:none;" onchange="saveGiveawayTimerSettings()">
+      <span style="font-size:11px;color:var(--dark-muted);">min</span>
+    </div>
+
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;margin-bottom:12px;">
       <div class="field" style="margin:0;">
         <label>Manually Add Entrant</label>
@@ -2125,6 +2132,25 @@ async function resetGiveaway() {
   }
 }
 
+async function saveGiveawayTimerSettings() {
+  const enabled = document.getElementById('giveaway-timer-enabled').checked;
+  const minutes = parseFloat(document.getElementById('giveaway-timer-minutes').value) || 5;
+  try {
+    const res = await fetch(`${OVERLAY_URL}/giveaway-timer-settings`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ enabled, minutes }),
+    });
+    if (res.ok) {
+      addLog(`Giveaway auto-close timer ${enabled ? `ON (${minutes}m)` : 'OFF'}`, 'ok');
+    } else {
+      addLog('Giveaway timer settings save failed', 'error');
+    }
+  } catch (e) {
+    addLog(`Giveaway timer settings error: ${e.message}`, 'error');
+  }
+}
+
 async function addGiveawayEntrant() {
   const input    = document.getElementById('giveaway-add-input');
   const username = input.value.trim();
@@ -2496,6 +2522,8 @@ async function testButtonPress() {
   }
 }
 
+let giveawayTimerSettingsLoaded = false;
+
 async function fetchGiveawayState() {
   try {
     const res  = await fetch(`${OVERLAY_URL}/giveaway-state`);
@@ -2507,6 +2535,14 @@ async function fetchGiveawayState() {
       data.active ? 'Collecting entries' : (data.winner ? 'Drawn' : 'Idle');
     document.getElementById('giveaway-winner-display').textContent =
       data.winner ? `🏆 ${data.winner.username}` : '';
+
+    // Only set these once on load — not every poll — so an in-progress edit
+    // (checking the box, typing a new minute value) never gets clobbered.
+    if (!giveawayTimerSettingsLoaded) {
+      giveawayTimerSettingsLoaded = true;
+      document.getElementById('giveaway-timer-enabled').checked = !!data.timerEnabled;
+      document.getElementById('giveaway-timer-minutes').value   = data.timerMinutes || 5;
+    }
 
     const list = document.getElementById('giveaway-entries-list');
     const entries = data.entries || [];
