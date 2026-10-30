@@ -330,6 +330,34 @@ function giveawayReset() {
   console.log('[giveaway] Reset');
 }
 
+// Mod-only manual entry — looks up the real Twitch user ID via Helix so it
+// dedupes against keyword-based entries the same way (by userId, not just
+// username text).
+async function giveawayAddEntrant(username) {
+  const clean = (username || '').trim().replace(/^@/, '');
+  if (!clean) return { success: false, error: 'No username provided' };
+  const lower = clean.toLowerCase();
+
+  if (giveawayState.entries.some(e => e.username.toLowerCase() === lower)) {
+    return { success: false, error: `${clean} is already entered` };
+  }
+
+  let userId = null;
+  try {
+    const token = await getValidToken();
+    if (token) {
+      const res = await helixGet(`/helix/users?login=${encodeURIComponent(lower)}`, token);
+      userId = res.body?.data?.[0]?.id || null;
+    }
+  } catch (e) {}
+
+  giveawayState.entries.push({ userId: userId || `manual:${lower}`, username: clean });
+  saveGiveawayState();
+  broadcastGiveaway({ status: giveawayState.active ? 'active' : 'stopped', keyword: giveawayState.keyword, count: giveawayState.entries.length });
+  console.log(`[giveaway] Manually added entrant: ${clean}`);
+  return { success: true };
+}
+
 function giveawayRemoveEntrant(username) {
   const target = (username || '').trim().replace(/^@/, '').toLowerCase();
   if (!target) return false;
@@ -1597,7 +1625,7 @@ function routeTwitchEvent(subType, event) {
         break;
       }
 
-      // Mod/broadcaster commands: !giveaway start|stop|close|draw|reset|remove <user>
+      // Mod/broadcaster commands: !giveaway start|stop|close|draw|reset|add|remove <user>
       if (text.startsWith('!giveaway ')) {
         if (!isChatMod(event)) {
           console.log(`[giveaway] Ignored !giveaway command from non-mod: ${event.chatter_user_name}`);
@@ -1615,6 +1643,8 @@ function routeTwitchEvent(subType, event) {
           if (!giveawayDraw()) sendChatMessage("No entries yet — can't draw a winner.");
         } else if (action === 'reset') {
           giveawayReset();
+        } else if (action === 'add') {
+          giveawayAddEntrant(arg);
         } else if (action === 'remove') {
           giveawayRemoveEntrant(arg);
         }
@@ -2395,6 +2425,24 @@ const server = http.createServer(async (req, res) => {
     giveawayReset();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  // ── POST /giveaway-add ──────────────────────────────────────
+  if (pathname === '/giveaway-add' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { username } = JSON.parse(body || '{}');
+        const result = await giveawayAddEntrant(username);
+        res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result.success ? { ok: true, giveaway: giveawayState } : result));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
     return;
   }
 

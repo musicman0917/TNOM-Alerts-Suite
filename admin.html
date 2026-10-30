@@ -841,6 +841,16 @@
       <button onclick="resetGiveaway()" class="danger" style="flex:1;padding:10px;">↺ Reset</button>
     </div>
 
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;margin-bottom:12px;">
+      <div class="field" style="margin:0;">
+        <label>Manually Add Entrant</label>
+        <input id="giveaway-add-input" type="text" placeholder="username" />
+      </div>
+      <button onclick="addGiveawayEntrant()" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">➕</span> Add
+      </button>
+    </div>
+
     <div class="token-row" style="justify-content:space-between;">
       <span>Entries: <strong id="giveaway-entry-count">0</strong></span>
       <span id="giveaway-winner-display" style="color:var(--amber);"></span>
@@ -2086,6 +2096,29 @@ async function resetGiveaway() {
     }
   } catch (e) {
     addLog(`Giveaway reset error: ${e.message}`, 'error');
+  }
+}
+
+async function addGiveawayEntrant() {
+  const input    = document.getElementById('giveaway-add-input');
+  const username = input.value.trim();
+  if (!username) return;
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/giveaway-add`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ username }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      addLog(`Added entrant: ${username}`, 'ok');
+      input.value = '';
+      fetchGiveawayState();
+    } else {
+      addLog(`Add entrant failed: ${data.error || 'unknown error'}`, 'warn');
+    }
+  } catch (e) {
+    addLog(`Add entrant error: ${e.message}`, 'error');
   }
 }
 
