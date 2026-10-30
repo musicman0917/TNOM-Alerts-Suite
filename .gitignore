@@ -3,6 +3,7 @@ node_modules/
 
 # Runtime state / secrets persisted by server.js
 .twitch-token.json
+.bot-token.json
 .goal-state.json
 .health-settings.json
 .theme.json

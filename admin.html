@@ -655,10 +655,15 @@
       <span class="dot" id="fourthwall-dot">⚪</span>
       <span id="fourthwall-status">Fourthwall: checking…</span>
     </div>
+    <div class="token-row">
+      <span class="dot" id="bot-token-dot">⚪</span>
+      <span id="bot-token-status">Bot token: checking…</span>
+    </div>
     <hr>
     <div class="btn-grid">
       <button onclick="checkStatus()"><span class="icon">↺</span> Refresh Status</button>
       <button onclick="window.open('http://192.168.6.228:3010/status','_blank')"><span class="icon">⊙</span> Raw Status</button>
+      <button onclick="window.open('http://192.168.6.228:3010/bot-auth','_blank')"><span class="icon">🤖</span> Authorize Bot</button>
     </div>
   </div>
 
@@ -1423,8 +1428,10 @@ function setStatus(state) {
 
 // ─── Token status ──────────────────────────────────────────────────────────
 async function checkStatus() {
-  const dot = document.getElementById('token-dot');
-  const txt = document.getElementById('token-status');
+  const dot    = document.getElementById('token-dot');
+  const txt    = document.getElementById('token-status');
+  const botDot = document.getElementById('bot-token-dot');
+  const botTxt = document.getElementById('bot-token-status');
   try {
     const res  = await fetch(`${OVERLAY_URL}/status`);
     const data = await res.json();
@@ -1438,9 +1445,19 @@ async function checkStatus() {
       txt.textContent = 'Token not authorized — visit /auth';
       addLog('Token not authorized', 'error');
     }
+    if (data.bot?.authorized) {
+      const exp = new Date(data.bot.expiresAt).toLocaleString();
+      botDot.textContent = '🟢';
+      botTxt.textContent = `Bot token valid (${data.bot.userLogin}) — expires ${exp}`;
+    } else {
+      botDot.textContent = '🔴';
+      botTxt.textContent = 'Bot token not authorized — click "Authorize Bot"';
+    }
   } catch (e) {
     dot.textContent = '🔴';
     txt.textContent = 'Could not reach token broker';
+    botDot.textContent = '🔴';
+    botTxt.textContent = 'Could not reach token broker';
     addLog(`Token broker unreachable: ${e.message}`, 'error');
   }
 }

@@ -27,6 +27,13 @@ const PORT           = parseInt(process.env.PORT)        || 3010;
 const SERVER_IP      = process.env.SERVER_IP             || '192.168.6.228';
 const TOKEN_FILE     = path.join(__dirname, '.twitch-token.json');
 
+// Bot account token (e.g. bardbouncerbot) — same Twitch app (CLIENT_ID),
+// different authorizing user, used by other local apps to send chat as the
+// bot via Helix instead of each maintaining their own IRC login + OAuth.
+const BOT_REDIRECT_URI = process.env.BOT_REDIRECT_URI || 'http://localhost:3010/bot-callback';
+const BOT_TOKEN_FILE   = path.join(__dirname, '.bot-token.json');
+const BOT_SCOPES = ['user:read:chat', 'user:write:chat'].join(' ');
+
 // Fourthwall Open API — optional. If unset, Fourthwall polling just stays off
 // (donations still work via the Streamer.bot path until this is configured).
 const FOURTHWALL_USERNAME = process.env.FOURTHWALL_USERNAME || '';
@@ -84,6 +91,40 @@ function loadTokens() {
       : Date.now() + (3600 - 300) * 1000; // assume ~1hr if unknown
     console.log('[nom-token-broker] Loaded tokens from .env');
     saveTokens(); // persist so future restarts use the file
+  }
+}
+
+// ─── Bot Token Store ────────────────────────────────────────────────────────
+let botTokenStore = {
+  accessToken:  null,
+  refreshToken: null,
+  expiresAt:    0,
+  userId:       null,
+  userLogin:    null,
+};
+
+function saveBotTokens() {
+  fs.writeFileSync(BOT_TOKEN_FILE, JSON.stringify(botTokenStore, null, 2));
+}
+
+function loadBotTokens() {
+  if (fs.existsSync(BOT_TOKEN_FILE)) {
+    try {
+      botTokenStore = JSON.parse(fs.readFileSync(BOT_TOKEN_FILE, 'utf8'));
+      console.log('[nom-token-broker] Loaded saved bot tokens from file');
+      return;
+    } catch (e) {
+      console.log('[nom-token-broker] Could not load bot token file, checking .env');
+    }
+  }
+  if (process.env.BOT_ACCESS_TOKEN) {
+    botTokenStore.accessToken  = process.env.BOT_ACCESS_TOKEN;
+    botTokenStore.refreshToken = process.env.BOT_REFRESH_TOKEN || null;
+    botTokenStore.expiresAt    = process.env.BOT_EXPIRES_AT
+      ? parseInt(process.env.BOT_EXPIRES_AT)
+      : Date.now() + (3600 - 300) * 1000;
+    console.log('[nom-token-broker] Loaded bot tokens from .env');
+    saveBotTokens();
   }
 }
 
@@ -1259,6 +1300,79 @@ function scheduleRefresh() {
   }, delay);
 }
 
+// ─── Bot Token Flow (same app, different authorizing user) ─────────────────
+async function exchangeBotCode(code) {
+  const data = await twitchPost('/oauth2/token', {
+    client_id:     CLIENT_ID,
+    client_secret: CLIENT_SECRET,
+    code,
+    grant_type:    'authorization_code',
+    redirect_uri:  BOT_REDIRECT_URI,
+  });
+  if (data.access_token) {
+    botTokenStore.accessToken  = data.access_token;
+    botTokenStore.refreshToken = data.refresh_token;
+    botTokenStore.expiresAt    = Date.now() + (data.expires_in - 300) * 1000;
+    // Find out who actually authorized (no `login` param = the token's own user)
+    const who = await helixGet('/helix/users', data.access_token);
+    const user = who.body?.data?.[0];
+    botTokenStore.userId    = user?.id || null;
+    botTokenStore.userLogin = user?.login || null;
+    saveBotTokens();
+    console.log(`[nom-token-broker] Bot token exchanged and saved ✓ (${botTokenStore.userLogin || 'unknown user'})`);
+  } else {
+    throw new Error(JSON.stringify(data));
+  }
+}
+
+async function refreshBotAccessToken() {
+  if (!botTokenStore.refreshToken) {
+    console.log('[nom-token-broker] No bot refresh token — authorization required');
+    return false;
+  }
+  try {
+    const data = await twitchPost('/oauth2/token', {
+      client_id:     CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      grant_type:    'refresh_token',
+      refresh_token: botTokenStore.refreshToken,
+    });
+    if (data.access_token) {
+      botTokenStore.accessToken  = data.access_token;
+      botTokenStore.refreshToken = data.refresh_token || botTokenStore.refreshToken;
+      botTokenStore.expiresAt    = Date.now() + (data.expires_in - 300) * 1000;
+      saveBotTokens();
+      console.log('[nom-token-broker] Bot token refreshed ✓');
+      return true;
+    } else {
+      console.log('[nom-token-broker] Bot refresh failed:', JSON.stringify(data));
+      botTokenStore.accessToken = null;
+      return false;
+    }
+  } catch (e) {
+    console.log('[nom-token-broker] Bot refresh error:', e.message);
+    return false;
+  }
+}
+
+async function getValidBotToken() {
+  if (botTokenStore.accessToken && Date.now() < botTokenStore.expiresAt) {
+    return botTokenStore.accessToken;
+  }
+  const ok = await refreshBotAccessToken();
+  return ok ? botTokenStore.accessToken : null;
+}
+
+// Auto-refresh 5 min before expiry — same pattern as scheduleRefresh()
+function scheduleBotRefresh() {
+  const msUntilExpiry = botTokenStore.expiresAt - Date.now();
+  const delay = Math.max(msUntilExpiry, 60000);
+  setTimeout(async () => {
+    await refreshBotAccessToken();
+    scheduleBotRefresh();
+  }, delay);
+}
+
 // ─── Twitch Helix helper ────────────────────────────────────────────────────
 function helixPost(path, token, body) {
   return new Promise((resolve, reject) => {
@@ -1964,14 +2078,98 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /bot-token ───────────────────────────────────────────
+  // Other local apps (e.g. a chat bot's own process) fetch a fresh token
+  // here instead of maintaining their own OAuth — same pattern as /token.
+  if (pathname === '/bot-token') {
+    const token = await getValidBotToken();
+    if (token) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        token,
+        clientId:  CLIENT_ID,
+        userId:    botTokenStore.userId,
+        userLogin: botTokenStore.userLogin,
+      }));
+    } else {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        error:   'not_authorized',
+        message: `Visit http://localhost:${PORT}/bot-auth (logged in as the bot account) to authorize`,
+      }));
+    }
+    return;
+  }
+
+  // ── GET /bot-auth ─────────────────────────────────────────────
+  // Must be opened in a browser logged into Twitch AS THE BOT ACCOUNT, not
+  // the broadcaster — whoever approves this consent screen is who the
+  // resulting token belongs to.
+  if (pathname === '/bot-auth') {
+    const authUrl = new URL('https://id.twitch.tv/oauth2/authorize');
+    authUrl.searchParams.set('client_id',     CLIENT_ID);
+    authUrl.searchParams.set('redirect_uri',  BOT_REDIRECT_URI);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('scope',         BOT_SCOPES);
+    authUrl.searchParams.set('force_verify',  'true');
+    res.writeHead(302, { Location: authUrl.toString() });
+    res.end();
+    return;
+  }
+
+  // ── GET /bot-callback ────────────────────────────────────────
+  if (pathname === '/bot-callback') {
+    const code  = parsed.query.code;
+    const error = parsed.query.error;
+    if (error) {
+      res.writeHead(400, { 'Content-Type': 'text/html' });
+      res.end(`<h2>Authorization denied: ${error}</h2>`);
+      return;
+    }
+    if (!code) {
+      res.writeHead(400, { 'Content-Type': 'text/html' });
+      res.end('<h2>No code received</h2>');
+      return;
+    }
+    try {
+      await exchangeBotCode(code);
+      scheduleBotRefresh();
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(`<!DOCTYPE html><html><head>
+        <style>
+          body { background:#180C04; color:#F2E4CC; font-family:serif;
+                 display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
+          .box { text-align:center; border:1px solid #B87820; padding:40px 60px; border-radius:4px; }
+          h2 { color:#E89010; font-size:22px; margin-bottom:12px; }
+          p  { color:#C0986A; font-style:italic; }
+        </style></head><body>
+        <div class="box">
+          <h2>♩ Bot Authorized! ♩</h2>
+          <p>Token saved for ${botTokenStore.userLogin || 'the bot account'}. You can close this tab.</p>
+          <p style="margin-top:16px;font-size:13px;">nom-token-broker is running on port ${PORT}</p>
+        </div></body></html>`);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/html' });
+      res.end(`<h2>Bot token exchange failed: ${e.message}</h2>`);
+    }
+    return;
+  }
+
   // ── GET /status ────────────────────────────────────────────
   if (pathname === '/status') {
-    const token = await getValidToken();
+    const token    = await getValidToken();
+    const botToken = await getValidBotToken();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       authorized:  !!token,
       expiresAt:   tokenStore.expiresAt ? new Date(tokenStore.expiresAt).toISOString() : null,
       hasRefresh:  !!tokenStore.refreshToken,
+      bot: {
+        authorized: !!botToken,
+        userLogin:  botTokenStore.userLogin,
+        expiresAt:  botTokenStore.expiresAt ? new Date(botTokenStore.expiresAt).toISOString() : null,
+        hasRefresh: !!botTokenStore.refreshToken,
+      },
     }));
     return;
   }
@@ -2874,6 +3072,7 @@ const server = http.createServer(async (req, res) => {
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 loadTokens();
+loadBotTokens();
 loadGoalState();
 loadHealthSettings();
 loadThemeState();
@@ -2895,6 +3094,11 @@ server.listen(PORT, '0.0.0.0', () => {
     checkInitialStreamCategory();
   } else {
     console.log(`[nom-token-broker] Not authorized yet — visit http://localhost:${PORT}/auth on the server`);
+  }
+  if (botTokenStore.refreshToken) {
+    scheduleBotRefresh();
+  } else {
+    console.log(`[nom-token-broker] Bot not authorized yet — visit http://localhost:${PORT}/bot-auth on the server`);
   }
   pollAdSchedule();
   setInterval(pollAdSchedule, 60000);
