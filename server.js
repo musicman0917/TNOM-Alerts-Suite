@@ -1772,6 +1772,15 @@ function routeTwitchEvent(subType, event) {
         break;
       }
 
+      // Viewer command — anyone can check whether they're currently entered.
+      if (text === '!didienter') {
+        const userId   = event.chatter_user_id;
+        const username = (event.chatter_user_name || '').toLowerCase();
+        const entered  = giveawayState.entries.some(e => e.userId === userId || e.username.toLowerCase() === username);
+        sendChatMessage(`@${event.chatter_user_name} ${entered ? 'Yes' : 'No'}, you ${entered ? 'are' : 'are not'} entered in the giveaway!`);
+        break;
+      }
+
       // Mod/broadcaster commands: !timer set <duration> [label] | !timer cancel
       if (text.startsWith('!timer ')) {
         if (!isChatMod(event)) {
