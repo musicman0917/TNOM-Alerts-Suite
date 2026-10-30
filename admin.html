@@ -480,8 +480,9 @@
 </header>
 
 <div class="tab-bar">
-  <button class="tab-btn active" id="tab-btn-main"    onclick="switchAdminTab('main')">Main</button>
-  <button class="tab-btn"        id="tab-btn-karaoke" onclick="switchAdminTab('karaoke')">🎤 Karaoke</button>
+  <button class="tab-btn active" id="tab-btn-main"     onclick="switchAdminTab('main')">Main</button>
+  <button class="tab-btn"        id="tab-btn-karaoke"  onclick="switchAdminTab('karaoke')">🎤 Karaoke</button>
+  <button class="tab-btn"        id="tab-btn-giveaway" onclick="switchAdminTab('giveaway')">🎉 Giveaway</button>
 </div>
 
 <main id="tab-main">
@@ -823,57 +824,6 @@
     </div>
   </div>
 
-  <!-- ── Giveaway ── -->
-  <div class="panel full">
-    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
-      <span>Giveaway</span>
-      <span id="giveaway-status-badge" style="font-size:11px;font-style:italic;color:var(--dark-muted);">Idle</span>
-    </div>
-
-    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;margin-bottom:12px;">
-      <div class="field" style="margin:0;">
-        <label>Entry Keyword</label>
-        <input id="giveaway-keyword-input" type="text" placeholder="!enter" />
-      </div>
-      <button onclick="startGiveaway()" style="height:38px;padding:0 16px;margin-bottom:0;">
-        <span class="icon">▶</span> Start
-      </button>
-    </div>
-
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-      <button onclick="stopGiveaway()" style="flex:1;padding:10px;">Close Entries</button>
-      <button onclick="drawGiveawayWinner()" style="flex:1;padding:10px;">🎉 Draw Winner</button>
-      <button onclick="resetGiveaway()" class="danger" style="flex:1;padding:10px;">↺ Reset</button>
-    </div>
-
-    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;margin-bottom:12px;">
-      <div class="field" style="margin:0;">
-        <label>Manually Add Entrant</label>
-        <input id="giveaway-add-input" type="text" placeholder="username" />
-      </div>
-      <button onclick="addGiveawayEntrant()" style="height:38px;padding:0 16px;margin-bottom:0;">
-        <span class="icon">➕</span> Add
-      </button>
-    </div>
-
-    <div class="token-row" style="justify-content:space-between;">
-      <span>Entries: <strong id="giveaway-entry-count">0</strong></span>
-      <span id="giveaway-winner-display" style="color:var(--amber);"></span>
-    </div>
-
-    <hr>
-    <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--amber);margin-bottom:12px;">Discord Webhook (winner announcements)</div>
-    <div style="display:grid;grid-template-columns:3fr 1fr;gap:12px;align-items:end;">
-      <div class="field" style="margin:0;">
-        <label>Webhook URL</label>
-        <input id="discord-webhook-input" type="text" placeholder="https://discord.com/api/webhooks/..." />
-      </div>
-      <button onclick="saveDiscordWebhook()" style="height:38px;padding:0 16px;margin-bottom:0;">
-        <span class="icon">💾</span> Save
-      </button>
-    </div>
-  </div>
-
   <!-- ── Wheel of Chaos ── -->
   <div class="panel full">
     <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
@@ -1169,6 +1119,61 @@
 
 </div>
 
+<!-- ── Giveaway tab ── -->
+<main id="tab-giveaway" style="display:none;">
+
+  <div class="panel full">
+    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Giveaway</span>
+      <span id="giveaway-status-badge" style="font-size:11px;font-style:italic;color:var(--dark-muted);">Idle</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;margin-bottom:12px;">
+      <div class="field" style="margin:0;">
+        <label>Entry Keyword</label>
+        <input id="giveaway-keyword-input" type="text" placeholder="!enter" />
+      </div>
+      <button onclick="startGiveaway()" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">▶</span> Start
+      </button>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <button onclick="stopGiveaway()" style="flex:1;padding:10px;">Close Entries</button>
+      <button onclick="drawGiveawayWinner()" style="flex:1;padding:10px;">🎉 Draw Winner</button>
+      <button onclick="resetGiveaway()" class="danger" style="flex:1;padding:10px;">↺ Reset</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;margin-bottom:12px;">
+      <div class="field" style="margin:0;">
+        <label>Manually Add Entrant</label>
+        <input id="giveaway-add-input" type="text" placeholder="username" />
+      </div>
+      <button onclick="addGiveawayEntrant()" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">➕</span> Add
+      </button>
+    </div>
+
+    <div class="token-row" style="justify-content:space-between;">
+      <span>Entries: <strong id="giveaway-entry-count">0</strong></span>
+      <span id="giveaway-winner-display" style="color:var(--amber);"></span>
+    </div>
+
+    <hr>
+    <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--amber);margin-bottom:12px;">Discord Webhook (winner announcements)</div>
+    <div style="display:grid;grid-template-columns:3fr 1fr;gap:12px;align-items:end;">
+      <div class="field" style="margin:0;">
+        <label>Webhook URL</label>
+        <input id="discord-webhook-input" type="text" placeholder="https://discord.com/api/webhooks/..." />
+      </div>
+      <button onclick="saveDiscordWebhook()" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">💾</span> Save
+      </button>
+    </div>
+  </div>
+
+</main>
+
 <div id="toast"></div>
 
 <script>
@@ -1179,10 +1184,12 @@ const OVERLAY_URL = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
 
 // ─── Admin tabs ──────────────────────────────────────────────────────────────
 function switchAdminTab(name) {
-  document.getElementById('tab-main').style.display    = name === 'main'    ? '' : 'none';
-  document.getElementById('tab-karaoke').style.display  = name === 'karaoke' ? '' : 'none';
-  document.getElementById('tab-btn-main').classList.toggle('active',    name === 'main');
-  document.getElementById('tab-btn-karaoke').classList.toggle('active', name === 'karaoke');
+  document.getElementById('tab-main').style.display     = name === 'main'     ? '' : 'none';
+  document.getElementById('tab-karaoke').style.display   = name === 'karaoke'  ? '' : 'none';
+  document.getElementById('tab-giveaway').style.display  = name === 'giveaway' ? '' : 'none';
+  document.getElementById('tab-btn-main').classList.toggle('active',     name === 'main');
+  document.getElementById('tab-btn-karaoke').classList.toggle('active',  name === 'karaoke');
+  document.getElementById('tab-btn-giveaway').classList.toggle('active', name === 'giveaway');
 }
 
 // ─── Karaoke Queue ────────────────────────────────────────────────────────────
