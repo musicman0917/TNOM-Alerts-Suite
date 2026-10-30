@@ -325,7 +325,7 @@ function giveawayStart(keyword) {
   giveawayState.entries = [];
   giveawayState.winner  = null;
   saveGiveawayState();
-  broadcastGiveaway({ status: 'started', keyword: giveawayState.keyword, count: 0 });
+  broadcastGiveaway({ status: 'started', keyword: giveawayState.keyword, count: 0, entries: [] });
   sendChatMessage(`🎉 Giveaway started! Type ${giveawayState.keyword} in chat to enter!`);
   console.log(`[giveaway] Started — keyword: ${giveawayState.keyword}`);
 }
@@ -333,7 +333,7 @@ function giveawayStart(keyword) {
 function giveawayCloseEntries() {
   giveawayState.active = false;
   saveGiveawayState();
-  broadcastGiveaway({ status: 'stopped', keyword: giveawayState.keyword, count: giveawayState.entries.length });
+  broadcastGiveaway({ status: 'stopped', keyword: giveawayState.keyword, count: giveawayState.entries.length, entries: giveawayState.entries.map(e => e.username) });
   sendChatMessage(`🔒 Giveaway entries are closed! ${giveawayState.entries.length} entered — winner coming soon!`);
   console.log(`[giveaway] Entries closed — ${giveawayState.entries.length} total`);
 }
@@ -394,7 +394,12 @@ async function giveawayAddEntrant(username) {
 
   giveawayState.entries.push({ userId: userId || `manual:${lower}`, username: clean });
   saveGiveawayState();
-  broadcastGiveaway({ status: giveawayState.active ? 'active' : 'stopped', keyword: giveawayState.keyword, count: giveawayState.entries.length });
+  broadcastGiveaway({
+    status:  giveawayState.active ? 'active' : 'stopped',
+    keyword: giveawayState.keyword,
+    count:   giveawayState.entries.length,
+    entries: giveawayState.entries.map(e => e.username),
+  });
   console.log(`[giveaway] Manually added entrant: ${clean}`);
   return { success: true };
 }
@@ -411,6 +416,7 @@ function giveawayRemoveEntrant(username) {
       status:  giveawayState.active ? 'active' : 'stopped',
       keyword: giveawayState.keyword,
       count:   giveawayState.entries.length,
+      entries: giveawayState.entries.map(e => e.username),
     });
     console.log(`[giveaway] Removed entrant: ${target}`);
   }
@@ -1734,7 +1740,7 @@ function routeTwitchEvent(subType, event) {
         if (giveawayState.entries.some(e => e.userId === userId)) break; // one entry per viewer
         giveawayState.entries.push({ userId, username });
         saveGiveawayState();
-        broadcastGiveaway({ status: 'active', keyword: giveawayState.keyword, count: giveawayState.entries.length });
+        broadcastGiveaway({ status: 'active', keyword: giveawayState.keyword, count: giveawayState.entries.length, entries: giveawayState.entries.map(e => e.username) });
         console.log(`[giveaway] ${username} entered (${giveawayState.entries.length} total)`);
         break;
       }

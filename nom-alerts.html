@@ -670,6 +670,28 @@
     font-size: 11px; font-style: italic;
     color: var(--muted);
   }
+  .gw-names {
+    margin-top: 6px;
+    max-height: 140px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .gw-name-item {
+    font-family: 'Crimson Pro', serif;
+    font-size: 11px;
+    color: var(--cream);
+    opacity: .85;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    animation: gwNameIn .3s ease-out;
+  }
+  @keyframes gwNameIn {
+    from { opacity: 0; transform: translateX(-6px); }
+    to   { opacity: .85; transform: none; }
+  }
 
   /* ─── Giveaway Winner Reveal (takeover) ──────────────── */
   #giveaway-reveal {
@@ -1226,6 +1248,7 @@
   <div class="gw-title">🎉 Giveaway</div>
   <div class="gw-keyword" id="giveaway-keyword">Type !enter to win!</div>
   <div class="gw-count" id="giveaway-count">0 entered</div>
+  <div class="gw-names" id="giveaway-names"></div>
 </div>
 
 <!-- ── Giveaway Winner Reveal (takeover) ── -->
@@ -1724,6 +1747,20 @@ const GIVEAWAY_BEFORE    = 24;  // filler rows spun through before the winner
 let   giveawayLandFn     = null; // current transitionend handler, so we can remove it on a new draw
 let   giveawayHideTimer  = null; // pending "hide the winner badge" timeout, cleared if a new giveaway starts first
 
+// Shows who's entered so far — newest first, capped so the widget doesn't
+// grow unbounded for a big giveaway. Purely visual confirmation for viewers
+// ("yep, I'm in") without the bot replying in chat for every entry.
+const GIVEAWAY_NAMES_MAX = 8;
+function renderGiveawayNames(names) {
+  const namesEl = document.getElementById('giveaway-names');
+  if (!names || !names.length) { namesEl.innerHTML = ''; return; }
+  const recent = [...names].reverse();
+  const shown  = recent.slice(0, GIVEAWAY_NAMES_MAX);
+  const extra  = recent.length - shown.length;
+  namesEl.innerHTML = shown.map(n => `<div class="gw-name-item">✓ ${n}</div>`).join('')
+    + (extra > 0 ? `<div class="gw-name-item">+${extra} more</div>` : '');
+}
+
 function renderGiveaway(data) {
   const widget    = document.getElementById('giveaway-widget');
   const keywordEl = document.getElementById('giveaway-keyword');
@@ -1736,6 +1773,7 @@ function renderGiveaway(data) {
     clearTimeout(giveawayHideTimer);
     keywordEl.textContent = `Type ${data.keyword} to win!`;
     countEl.textContent   = `${data.count || 0} entered`;
+    renderGiveawayNames(data.entries);
     widget.classList.add('visible');
     return;
   }
@@ -1743,12 +1781,14 @@ function renderGiveaway(data) {
   if (data.status === 'stopped') {
     clearTimeout(giveawayHideTimer);
     countEl.textContent = `${data.count || 0} entered — entries closed`;
+    renderGiveawayNames(data.entries);
     return;
   }
 
   if (data.status === 'drawing') {
     clearTimeout(giveawayHideTimer);
     widget.classList.remove('visible');
+    renderGiveawayNames(null);
     if (giveawayLandFn) reel.removeEventListener('transitionend', giveawayLandFn);
 
     const pool = (data.entries && data.entries.length) ? data.entries : [data.winner];
@@ -1808,6 +1848,7 @@ function renderGiveaway(data) {
     widget.classList.remove('visible');
     reveal.classList.remove('visible');
     countEl.textContent = '0 entered';
+    renderGiveawayNames(null);
     return;
   }
 }
