@@ -774,6 +774,11 @@ async function karaokeAddToQueue(username, song) {
 }
 
 function karaokeNext() {
+  // Round-robin — whoever just finished goes to the back of the queue
+  // instead of dropping out entirely, so everyone gets another turn.
+  if (karaokeQueueState.nowSinging) {
+    karaokeQueueState.queue.push(karaokeQueueState.nowSinging);
+  }
   karaokeQueueState.nowSinging = karaokeQueueState.queue.shift() || null;
   saveKaraokeQueueState();
   broadcastKaraokeQueue();
