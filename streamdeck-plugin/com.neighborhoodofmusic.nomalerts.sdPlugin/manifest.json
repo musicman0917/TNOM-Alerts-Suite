@@ -30,6 +30,7 @@
       "Tooltip": "Toggle all overlay alerts on/off",
       "PropertyInspectorPath": "pi/settings.html",
       "Controllers": ["Keypad"],
+      "DisableAutomaticStates": true,
       "States": [
         {
           "Image": "imgs/actions/panic/key-active",
