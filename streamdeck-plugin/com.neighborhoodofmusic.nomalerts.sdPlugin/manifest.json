@@ -1,0 +1,145 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "Name": "NOM Alerts",
+  "Author": "neighborhoodofmusic",
+  "Version": "1.0.0.0",
+  "Description": "Control panel buttons for the NOM Alerts suite — panic button, giveaway, and karaoke queue controls.",
+  "UUID": "com.neighborhoodofmusic.nomalerts",
+  "Icon": "imgs/plugin/plugin-icon",
+  "CategoryIcon": "imgs/plugin/category-icon",
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "6.5"
+  },
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Nodejs": {
+    "Version": "20"
+  },
+  "CodePath": "bin/plugin.js",
+  "PropertyInspectorPath": "pi/settings.html",
+  "Actions": [
+    {
+      "Name": "Panic Button",
+      "UUID": "com.neighborhoodofmusic.nomalerts.panic",
+      "Icon": "imgs/actions/panic/icon",
+      "Tooltip": "Toggle all overlay alerts on/off",
+      "PropertyInspectorPath": "pi/settings.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/panic/key-active",
+          "Title": "ALERTS\nACTIVE",
+          "TitleAlignment": "middle",
+          "FontSize": 11
+        },
+        {
+          "Image": "imgs/actions/panic/key-paused",
+          "Title": "PAUSED",
+          "TitleAlignment": "middle",
+          "FontSize": 12
+        }
+      ]
+    },
+    {
+      "Name": "Giveaway: Start",
+      "UUID": "com.neighborhoodofmusic.nomalerts.giveawaystart",
+      "Icon": "imgs/actions/giveaway-start/icon",
+      "Tooltip": "Start a giveaway (optional custom keyword in settings)",
+      "PropertyInspectorPath": "pi/giveaway-start.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/giveaway-start/key",
+          "Title": "START\nGIVEAWAY",
+          "TitleAlignment": "middle",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "Name": "Giveaway: Close Entries",
+      "UUID": "com.neighborhoodofmusic.nomalerts.giveawayclose",
+      "Icon": "imgs/actions/giveaway-close/icon",
+      "Tooltip": "Close giveaway entries",
+      "PropertyInspectorPath": "pi/settings.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/giveaway-close/key",
+          "Title": "CLOSE\nENTRIES",
+          "TitleAlignment": "middle",
+          "FontSize": 10
+        }
+      ]
+    },
+    {
+      "Name": "Giveaway: Draw Winner",
+      "UUID": "com.neighborhoodofmusic.nomalerts.giveawaydraw",
+      "Icon": "imgs/actions/giveaway-draw/icon",
+      "Tooltip": "Draw a random giveaway winner",
+      "PropertyInspectorPath": "pi/settings.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/giveaway-draw/key",
+          "Title": "DRAW\nWINNER",
+          "TitleAlignment": "middle",
+          "FontSize": 11
+        }
+      ]
+    },
+    {
+      "Name": "Giveaway: Reset",
+      "UUID": "com.neighborhoodofmusic.nomalerts.giveawayreset",
+      "Icon": "imgs/actions/giveaway-reset/icon",
+      "Tooltip": "Reset the giveaway (clears all entries)",
+      "PropertyInspectorPath": "pi/settings.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/giveaway-reset/key",
+          "Title": "RESET",
+          "TitleAlignment": "middle",
+          "FontSize": 13
+        }
+      ]
+    },
+    {
+      "Name": "Karaoke: Next Singer",
+      "UUID": "com.neighborhoodofmusic.nomalerts.karaokenext",
+      "Icon": "imgs/actions/karaoke-next/icon",
+      "Tooltip": "Advance the karaoke queue to the next singer",
+      "PropertyInspectorPath": "pi/settings.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/karaoke-next/key",
+          "Title": "NEXT\nSINGER",
+          "TitleAlignment": "middle",
+          "FontSize": 11
+        }
+      ]
+    },
+    {
+      "Name": "Karaoke: Clear Queue",
+      "UUID": "com.neighborhoodofmusic.nomalerts.karaokeclear",
+      "Icon": "imgs/actions/karaoke-clear/icon",
+      "Tooltip": "Clear the entire karaoke queue",
+      "PropertyInspectorPath": "pi/settings.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/karaoke-clear/key",
+          "Title": "CLEAR\nQUEUE",
+          "TitleAlignment": "middle",
+          "FontSize": 11
+        }
+      ]
+    }
+  ]
+}

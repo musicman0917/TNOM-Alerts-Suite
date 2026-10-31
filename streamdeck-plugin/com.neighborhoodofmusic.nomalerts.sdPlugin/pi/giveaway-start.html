@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Giveaway Start Settings</title>
+  <script src="https://sdpi-components.dev/releases/v3/sdpi-components.js"></script>
+</head>
+<body>
+  <sdpi-item label="Server URL">
+    <sdpi-textfield
+      setting="serverUrl"
+      global
+      placeholder="http://192.168.6.228:3010"
+    ></sdpi-textfield>
+  </sdpi-item>
+  <sdpi-item label="Keyword (optional)">
+    <sdpi-textfield
+      setting="keyword"
+      placeholder="!enter"
+    ></sdpi-textfield>
+  </sdpi-item>
+  <sdpi-item label="">
+    <span style="opacity:.6;font-size:11px;">
+      Leave Keyword blank to use whatever's currently set on the server (defaults to !enter).
+    </span>
+  </sdpi-item>
+</body>
+</html>
