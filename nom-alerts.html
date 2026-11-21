@@ -1147,13 +1147,15 @@
 
   #charity-widget {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
     pointer-events: none;
   }
-  #charity-bar-row { width: 150px; }
+  #charity-icon { font-size: 15px; line-height: 1; }
+  #charity-bar-row { width: 70px; height: 6px; }
+  #charity-amounts { font-size: 10px; margin: 0; white-space: nowrap; }
   .health-fill.charity { background: linear-gradient(to right, #8B1838, #E8749A); }
 
 </style>
@@ -1209,16 +1211,11 @@
 
   <!-- Charity Donothon -->
   <div id="charity-widget">
-    <div class="health-bar-row" id="charity-bar-row">
-      <div class="health-bar-header">
-        <span class="health-bar-label">💝 Donothon</span>
-        <span class="health-bar-value" id="charity-amounts">$0 / $0</span>
-      </div>
-      <div class="health-track">
-        <div class="health-fill charity" id="charity-fill"></div>
-      </div>
+    <span id="charity-icon">💝</span>
+    <div class="health-track" id="charity-bar-row">
+      <div class="health-fill charity" id="charity-fill"></div>
     </div>
-    <div class="goal-amounts" id="charity-timer-text">--:--:--</div>
+    <span class="health-bar-value" id="charity-amounts">$0 / $0</span>
   </div>
 
 </div><!-- end #top-left-widgets -->
@@ -3420,13 +3417,6 @@ function updateCharityGoalUI(totalRaised, goal) {
   document.getElementById('charity-fill').style.width = `${pct * 100}%`;
 }
 
-function updateCharityTimer(seconds) {
-  const s = Math.max(0, Math.floor(Number(seconds) || 0));
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  const pad = (n) => String(n).padStart(2, '0');
-  document.getElementById('charity-timer-text').textContent = `${pad(h)}:${pad(m)}:${pad(sec)}`;
-}
-
 function setCharityWidgetVisible(visible) {
   const widget = document.getElementById('charity-widget');
   if (widget) widget.style.display = visible ? '' : 'none';
@@ -3470,7 +3460,6 @@ function connectCharityBus() {
     switch (data.type) {
       case 'state':
         updateCharityGoalUI(data.totalRaised, data.goal);
-        updateCharityTimer(data.currentTimer);
         charityEnabledByAdmin = data.timerVisible !== false;
         applyCharityVisibility();
         break;
@@ -3482,9 +3471,6 @@ function connectCharityBus() {
         break;
       case 'milestoneReached':
         showAlert('charity_milestone', charityFormatMoney(data.amount), null, data.label);
-        break;
-      case 'timerTick':
-        updateCharityTimer(data.currentTimer);
         break;
       case 'timerVisibilityUpdate':
         charityEnabledByAdmin = !!data.timerVisible;
