@@ -17,6 +17,9 @@ node_modules/
 .checkin-state.json
 .button-state.json
 .karaoke-queue-state.json
+.charity-state.json
+.charity-donation-tiers.json
+.charity-asset-images.json
 
 npm-debug.log*
 *.log

@@ -17,6 +17,8 @@ const https    = require('https');
 const fs       = require('fs');
 const path     = require('path');
 const url      = require('url');
+const crypto   = require('crypto');
+const multer   = require('multer');
 
 // ─── Config ────────────────────────────────────────────────────────────────
 const CLIENT_ID      = process.env.TWITCH_CLIENT_ID      || 'ahmv5pa2kzq44jvn81i7z3k0jqmtgl';
@@ -208,6 +210,7 @@ function broadcastStreamStatus() {
   for (const client of sseClients) {
     try { client.write(data); } catch (e) { sseClients.delete(client); }
   }
+  broadcastCharity({ type: 'streamStatusUpdate', streamLive });
 }
 
 async function checkInitialStreamStatus() {
@@ -1207,7 +1210,7 @@ async function pollAdSchedule() {
 
 // ─── Integrations (Discord webhook, etc.) ──────────────────────────────────
 const INTEGRATIONS_FILE = path.join(__dirname, '.integrations.json');
-let integrations = { discordWebhookUrl: '' };
+let integrations = { discordWebhookUrl: '', charityDiscordWebhookUrl: '' };
 
 function loadIntegrations() {
   if (fs.existsSync(INTEGRATIONS_FILE)) {
@@ -2095,6 +2098,438 @@ function connectEventSub(customUrl) {
   });
 }
 
+// ─── Charity Donothon Overlay (Extra Life) ─────────────────────────────────
+// Ported from a previously-separate app (CharityOverlay, port 3011) so there's
+// a single server/source instead of two. Talks to Extra Life's public
+// DonorDrive API directly (no auth needed), ticks a countdown timer that
+// donations add time to, and runs its own donation-based giveaway (distinct
+// from the !giveaway keyword-entry system above). Zoo-events and the
+// karaoke/coworking overlay variants from the original app were dropped as
+// unused; everything else carried over.
+const CHARITY_PARTICIPANT_ID    = process.env.CHARITY_PARTICIPANT_ID || '567118';
+const CHARITY_GOAL_AMOUNT       = Number(process.env.CHARITY_GOAL_AMOUNT || 1000);
+const CHARITY_POLL_INTERVAL_MS  = Number(process.env.CHARITY_POLL_INTERVAL_MS || 15000);
+const CHARITY_DONATION_LINK_URL = `https://dd.extra-life.org/participants/${CHARITY_PARTICIPANT_ID}`;
+const CHARITY_DONATION_REMINDER_INTERVAL_MS = Number(process.env.CHARITY_DONATION_REMINDER_INTERVAL_MS || 15 * 60 * 1000);
+const CHARITY_DISCORD_MIN_DONATION_AMOUNT  = 1; // Discord embed only posts for donations >= this
+const CHARITY_GIVEAWAY_MIN_DONATION_AMOUNT = 5; // a single donation must be at least this to earn any entries
+const CHARITY_GIVEAWAY_ENTRY_AMOUNT        = 5; // one entry per this many dollars
+
+function charityNormalizeNameForMatch(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+const CHARITY_GIVEAWAY_EXCLUDED_NAMES = (process.env.CHARITY_GIVEAWAY_EXCLUDED_NAMES || 'neighborhoodofmusic')
+  .split(',')
+  .map((n) => charityNormalizeNameForMatch(n))
+  .filter(Boolean);
+
+const CHARITY_DEFAULT_STARTING_HOURS   = Number(process.env.CHARITY_STARTING_HOURS || 4);
+const CHARITY_DEFAULT_STARTING_SECONDS = CHARITY_DEFAULT_STARTING_HOURS * 60 * 60;
+const CHARITY_SECONDS_PER_DOLLAR            = 120;      // +2 minutes per $1 donated
+const CHARITY_BONUS_TIME_SECONDS_PER_DOLLAR = 5 * 60;    // +5 minutes per $1 while Bonus Time is active
+
+const CHARITY_PARTICIPANT_URL = `https://extra-life.org/api/participants/${CHARITY_PARTICIPANT_ID}`;
+const CHARITY_DONATIONS_URL   = `https://extra-life.org/api/participants/${CHARITY_PARTICIPANT_ID}/donations`;
+const CHARITY_INCENTIVES_URL  = `https://extra-life.org/api/participants/${CHARITY_PARTICIPANT_ID}/incentives`;
+const CHARITY_MILESTONES_URL  = `https://extra-life.org/api/participants/${CHARITY_PARTICIPANT_ID}/milestones`;
+
+function extraLifeGet(fullUrl) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(fullUrl);
+    const opts = {
+      hostname: u.hostname,
+      path:     u.pathname + u.search,
+      method:   'GET',
+      headers:  { 'User-Agent': 'NOM-Alerts-Charity-Overlay/1.0' },
+      timeout:  10000,
+    };
+    const req = https.request(opts, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+        catch (e) { reject(new Error(`Invalid JSON from ${u.hostname}: ${e.message}`)); }
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('request timed out')));
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+const CHARITY_STATE_FILE   = path.join(__dirname, '.charity-state.json');
+const CHARITY_TIERS_FILE   = path.join(__dirname, '.charity-donation-tiers.json');
+const CHARITY_IMAGES_FILE  = path.join(__dirname, '.charity-asset-images.json');
+const CHARITY_SOUNDS_DIR   = path.join(__dirname, 'Assets', 'Sounds');
+const CHARITY_IMAGES_DIR   = path.join(__dirname, 'Assets', 'Images');
+
+const CHARITY_DEFAULT_TIERS = [
+  { id: 'tier1', label: 'Small Donation',  minAmount: 1,   durationMs: 5000, sounds: [] },
+  { id: 'tier2', label: 'Medium Donation', minAmount: 25,  durationMs: 6500, sounds: [] },
+  { id: 'tier3', label: 'Large Donation',  minAmount: 100, durationMs: 8000, sounds: [] },
+];
+const CHARITY_DEFAULT_ASSET_IMAGES = [
+  { id: 'qr-code',               label: 'QR Code',               file: null },
+  { id: 'extra-life-logo',       label: 'Extra Life Logo',       file: null },
+  { id: 'dayton-childrens-logo', label: "Dayton Children's Logo", file: null },
+];
+
+// Each sound is normalized to { path, name } — tolerates older/bare-string
+// formats from a previous version of the ported app.
+function charityNormalizeSounds(sounds) {
+  if (!Array.isArray(sounds)) return [];
+  return sounds
+    .map((s) => {
+      if (typeof s === 'string' && s) return { path: s, name: path.basename(s) };
+      if (s && typeof s.path === 'string' && s.path) {
+        return { path: s.path, name: typeof s.name === 'string' && s.name ? s.name : path.basename(s.path) };
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
+let charityDonationTiers = CHARITY_DEFAULT_TIERS;
+function loadCharityDonationTiers() {
+  if (fs.existsSync(CHARITY_TIERS_FILE)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(CHARITY_TIERS_FILE, 'utf8'));
+      if (Array.isArray(parsed)) {
+        charityDonationTiers = parsed.map((tier) => {
+          const { sound, sounds, ...rest } = tier;
+          const source = Array.isArray(sounds) ? sounds : (typeof sound === 'string' && sound ? [sound] : []);
+          return { ...rest, sounds: charityNormalizeSounds(source) };
+        });
+      }
+    } catch (e) { console.log('[charity] Could not load donation tiers, using defaults'); }
+  }
+}
+function saveCharityDonationTiers() {
+  fs.writeFileSync(CHARITY_TIERS_FILE, JSON.stringify(charityDonationTiers, null, 2));
+}
+
+let charityAssetImages = CHARITY_DEFAULT_ASSET_IMAGES;
+function loadCharityAssetImages() {
+  if (fs.existsSync(CHARITY_IMAGES_FILE)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(CHARITY_IMAGES_FILE, 'utf8'));
+      if (Array.isArray(parsed)) charityAssetImages = parsed;
+    } catch (e) { console.log('[charity] Could not load asset images, using defaults'); }
+  }
+}
+function saveCharityAssetImages() {
+  fs.writeFileSync(CHARITY_IMAGES_FILE, JSON.stringify(charityAssetImages, null, 2));
+}
+
+// Persisted runtime state — meant to run unattended for potentially weeks
+// before a scheduled stream, so it survives a pm2 restart instead of
+// resetting to fresh-install defaults.
+function charityLoadPersisted() {
+  try { return JSON.parse(fs.readFileSync(CHARITY_STATE_FILE, 'utf8')); }
+  catch { return {}; }
+}
+const charityPersisted = charityLoadPersisted();
+
+const charityState = {
+  baseSeconds: typeof charityPersisted.baseSeconds === 'number' ? charityPersisted.baseSeconds : CHARITY_DEFAULT_STARTING_SECONDS,
+  currentTimer: typeof charityPersisted.currentTimer === 'number'
+    ? charityPersisted.currentTimer
+    : (typeof charityPersisted.baseSeconds === 'number' ? charityPersisted.baseSeconds : CHARITY_DEFAULT_STARTING_SECONDS),
+  totalRaised: typeof charityPersisted.totalRaised === 'number' ? charityPersisted.totalRaised : 0,
+  goal: CHARITY_GOAL_AMOUNT,
+  latestDonorName: charityPersisted.latestDonorName ?? null,
+  latestDonorAmount: charityPersisted.latestDonorAmount ?? null,
+  processedDonationIds: new Set(charityPersisted.processedDonationIds || []),
+  hasBaseline: charityPersisted.hasBaseline ?? false,
+  // Fresh installs default to PAUSED — meant to sit accumulating donation
+  // time for days/weeks before the actual stream, never ticking on its own.
+  timerPaused: charityPersisted.timerPaused ?? true,
+  scheduledStartAt: charityPersisted.scheduledStartAt ?? null,
+  bonusTimeActive: charityPersisted.bonusTimeActive ?? false,
+  timeAdditionsEnabled: charityPersisted.timeAdditionsEnabled ?? true,
+  timerVisible: charityPersisted.timerVisible ?? true,
+  incentives: [], // re-fetched on boot, not persisted
+  milestones: Array.isArray(charityPersisted.milestones) ? charityPersisted.milestones : [],
+  reachedMilestones: new Set(charityPersisted.reachedMilestones || []),
+  milestonesChecked: charityPersisted.milestonesChecked ?? false,
+  giveawayEntries: (charityPersisted.giveawayEntries && typeof charityPersisted.giveawayEntries === 'object')
+    ? charityPersisted.giveawayEntries
+    : {},
+};
+
+function saveCharityState() {
+  fs.writeFileSync(CHARITY_STATE_FILE, JSON.stringify({
+    baseSeconds: charityState.baseSeconds,
+    currentTimer: charityState.currentTimer,
+    totalRaised: charityState.totalRaised,
+    latestDonorName: charityState.latestDonorName,
+    latestDonorAmount: charityState.latestDonorAmount,
+    processedDonationIds: [...charityState.processedDonationIds],
+    hasBaseline: charityState.hasBaseline,
+    timerPaused: charityState.timerPaused,
+    scheduledStartAt: charityState.scheduledStartAt,
+    bonusTimeActive: charityState.bonusTimeActive,
+    timeAdditionsEnabled: charityState.timeAdditionsEnabled,
+    timerVisible: charityState.timerVisible,
+    milestones: charityState.milestones,
+    reachedMilestones: [...charityState.reachedMilestones],
+    milestonesChecked: charityState.milestonesChecked,
+    giveawayEntries: charityState.giveawayEntries,
+  }, null, 2));
+}
+
+const charitySseClients = new Set();
+function charitySerializeState() {
+  return {
+    baseSeconds: charityState.baseSeconds,
+    currentTimer: charityState.currentTimer,
+    totalRaised: charityState.totalRaised,
+    goal: charityState.goal,
+    latestDonorName: charityState.latestDonorName,
+    latestDonorAmount: charityState.latestDonorAmount,
+    theme: themeState.theme,
+    streamLive,
+    milestones: charityState.milestones.map(m => ({ ...m, reached: charityState.reachedMilestones.has(m.amount) })),
+    timerPaused: charityState.timerPaused,
+    scheduledStartAt: charityState.scheduledStartAt,
+    bonusTimeActive: charityState.bonusTimeActive,
+    timeAdditionsEnabled: charityState.timeAdditionsEnabled,
+    timerVisible: charityState.timerVisible,
+    incentives: charityState.incentives,
+    giveawayEntries: charitySerializeGiveawayEntries(),
+  };
+}
+function broadcastCharity(payload) {
+  const data = `data: ${JSON.stringify(payload)}\n\n`;
+  for (const client of charitySseClients) {
+    try { client.write(data); } catch (e) { charitySseClients.delete(client); }
+  }
+}
+
+function charityFormatMoney(amount) {
+  return `$${Math.round(amount).toLocaleString('en-US')}`;
+}
+
+function charityGetTierForAmount(amount) {
+  const tiers = [...charityDonationTiers].filter(t => typeof t.minAmount === 'number').sort((a, b) => a.minAmount - b.minAmount);
+  let match = tiers[0] || null;
+  for (const tier of tiers) if (amount >= tier.minAmount) match = tier;
+  return match;
+}
+
+const CHARITY_DISCORD_TIER_STYLE = {
+  tier1: { title: '🎉 New Donation!', color: 0xffd700 },
+  tier2: { title: '🔥 Awesome Donation!', color: 0xffa500 },
+  tier3: { title: '🌟 INCREDIBLE Donation!', color: 0xff4500 },
+};
+const CHARITY_DEFAULT_DISCORD_STYLE = { title: '🎉 New Donation!', color: 0xffd700 };
+
+async function charityPostDiscordDonation(name, amount, secondsAdded) {
+  if (!integrations.charityDiscordWebhookUrl) return;
+  const tier = charityGetTierForAmount(amount);
+  const style = (tier && CHARITY_DISCORD_TIER_STYLE[tier.id]) || CHARITY_DEFAULT_DISCORD_STYLE;
+  const pct = charityState.goal > 0 ? Math.min(100, (charityState.totalRaised / charityState.goal) * 100) : 0;
+  const minutesAdded = Math.round(secondsAdded / 60);
+  await postDiscordWebhook(integrations.charityDiscordWebhookUrl, {
+    username: 'Donothon Alerts',
+    embeds: [{
+      title: style.title,
+      url: CHARITY_DONATION_LINK_URL,
+      description: `**${name}** donated **${charityFormatMoney(amount)}** to help kids at Dayton Children's Hospital! 💛`,
+      color: style.color,
+      fields: [
+        { name: 'Total Raised', value: `${charityFormatMoney(charityState.totalRaised)} / ${charityFormatMoney(charityState.goal)} (${pct.toFixed(1)}%)`, inline: true },
+        { name: 'Time Added', value: `+${minutesAdded} min`, inline: true },
+      ],
+      footer: { text: 'A Quest For The Kids · Extra Life' },
+      timestamp: new Date().toISOString(),
+    }],
+  });
+}
+
+function charityAnnounceIncentiveRedemption(name, incentiveID) {
+  if (!incentiveID) return;
+  const incentive = charityState.incentives.find(i => i.incentiveID === incentiveID);
+  if (incentive) sendChatMessage(`🎁 ${name} redeemed: ${incentive.description}`);
+  else sendChatMessage(`🎁 ${name} redeemed an incentive! (check the admin panel for details)`);
+}
+
+function charitySerializeGiveawayEntries() {
+  return Object.entries(charityState.giveawayEntries)
+    .map(([name, entries]) => ({ name, entries }))
+    .sort((a, b) => b.entries - a.entries);
+}
+
+function charityAddGiveawayEntries(name, amount) {
+  if (CHARITY_GIVEAWAY_EXCLUDED_NAMES.includes(charityNormalizeNameForMatch(name))) return;
+  if (amount < CHARITY_GIVEAWAY_MIN_DONATION_AMOUNT) return;
+  const entries = Math.floor(amount / CHARITY_GIVEAWAY_ENTRY_AMOUNT);
+  if (entries <= 0) return;
+  charityState.giveawayEntries[name] = (charityState.giveawayEntries[name] || 0) + entries;
+  broadcastCharity({ type: 'giveawayUpdate', giveawayEntries: charitySerializeGiveawayEntries() });
+}
+
+function charityDrawGiveawayWinner() {
+  const entrants = charitySerializeGiveawayEntries();
+  const totalEntries = entrants.reduce((sum, e) => sum + e.entries, 0);
+  if (totalEntries <= 0) return null;
+  let roll = Math.random() * totalEntries;
+  for (const entrant of entrants) {
+    roll -= entrant.entries;
+    if (roll < 0) return { ...entrant, totalEntries };
+  }
+  return { ...entrants[entrants.length - 1], totalEntries };
+}
+
+function charityCheckMilestones() {
+  const isFirstCheck = !charityState.milestonesChecked;
+  charityState.milestonesChecked = true;
+  const newlyReached = [];
+  for (const m of charityState.milestones) {
+    if (charityState.totalRaised >= m.amount && !charityState.reachedMilestones.has(m.amount)) {
+      charityState.reachedMilestones.add(m.amount);
+      newlyReached.push(m);
+    }
+  }
+  if (!newlyReached.length) return;
+  if (isFirstCheck) {
+    console.log(`[charity] milestone baseline: $${charityState.totalRaised} already covers ${newlyReached.map(m => `$${m.amount}`).join(', ')}`);
+    return;
+  }
+  for (const m of newlyReached) {
+    console.log(`[charity] milestone reached $${m.amount}: ${m.label}`);
+    broadcastCharity({ type: 'milestoneReached', amount: m.amount, label: m.label });
+    sendChatMessage(`🏆 Milestone reached: ${charityFormatMoney(m.amount)} — ${m.label}!`);
+  }
+  broadcastCharity({ type: 'milestonesUpdate', milestones: charitySerializeState().milestones });
+}
+
+// ── Donothon timer tick (every second) ──────────────────────────────────
+setInterval(() => {
+  if (charityState.scheduledStartAt && charityState.timerPaused && Date.now() >= new Date(charityState.scheduledStartAt).getTime()) {
+    charityState.timerPaused = false;
+    charityState.scheduledStartAt = null;
+    console.log('[charity] scheduled start time reached — resuming automatically');
+    broadcastCharity({ type: 'scheduleUpdate', scheduledStartAt: null });
+    saveCharityState();
+  }
+  if (!charityState.timerPaused && charityState.currentTimer > 0) {
+    charityState.currentTimer -= 1;
+    if (charityState.currentTimer < 0) charityState.currentTimer = 0;
+  }
+  broadcastCharity({ type: 'timerTick', currentTimer: charityState.currentTimer, timerPaused: charityState.timerPaused });
+}, 1000);
+setInterval(saveCharityState, 10000);
+
+// ── Extra Life / DonorDrive polling ─────────────────────────────────────
+async function charityPollTotalRaised() {
+  try {
+    const { body } = await extraLifeGet(CHARITY_PARTICIPANT_URL);
+    if (typeof body.sumDonations === 'number') {
+      charityState.totalRaised = body.sumDonations;
+      broadcastCharity({ type: 'totalUpdate', totalRaised: charityState.totalRaised, goal: charityState.goal });
+      charityCheckMilestones();
+      saveCharityState();
+    }
+  } catch (e) { console.error('[charity] failed to fetch participant total:', e.message); }
+}
+
+async function charityPollDonations() {
+  try {
+    const { body } = await extraLifeGet(CHARITY_DONATIONS_URL);
+    const donations = Array.isArray(body) ? body : [];
+
+    if (!charityState.hasBaseline) {
+      for (const d of donations) if (d.donationID != null) charityState.processedDonationIds.add(d.donationID);
+      charityState.hasBaseline = true;
+      saveCharityState();
+      return;
+    }
+
+    const sorted = [...donations].sort((a, b) => new Date(a.createdDateUTC) - new Date(b.createdDateUTC));
+    let processedAny = false;
+
+    for (const donation of sorted) {
+      const id = donation.donationID;
+      if (id == null || charityState.processedDonationIds.has(id)) continue;
+      processedAny = true;
+      charityState.processedDonationIds.add(id);
+
+      const amount = Number(donation.amount) || 0;
+      const isAnonymous = !(donation.displayName && donation.displayName.trim());
+      const name = isAnonymous ? 'Anonymous' : donation.displayName.trim();
+
+      const perDollarRate = charityState.bonusTimeActive ? CHARITY_BONUS_TIME_SECONDS_PER_DOLLAR : CHARITY_SECONDS_PER_DOLLAR;
+      const secondsToAdd = charityState.timeAdditionsEnabled ? Math.floor(amount) * perDollarRate : 0;
+      charityState.currentTimer += secondsToAdd;
+      charityState.latestDonorName = name;
+      charityState.latestDonorAmount = amount;
+
+      console.log(`[charity] ${name} donated $${amount.toFixed(2)} (+${secondsToAdd}s${charityState.bonusTimeActive ? ', bonus time' : ''})`);
+      broadcastCharity({ type: 'newDonation', name, amount });
+      broadcastCharity({ type: 'timerTick', currentTimer: charityState.currentTimer, timerPaused: charityState.timerPaused });
+      sendChatMessage(`🎉 ${charityFormatMoney(amount)} donation from ${name}! Thank you!`);
+      charityAnnounceIncentiveRedemption(name, donation.incentiveID);
+      if (amount >= CHARITY_DISCORD_MIN_DONATION_AMOUNT) charityPostDiscordDonation(name, amount, secondsToAdd);
+      if (!isAnonymous) charityAddGiveawayEntries(name, amount);
+    }
+    if (processedAny) saveCharityState();
+  } catch (e) { console.error('[charity] failed to fetch donations:', e.message); }
+}
+
+setInterval(() => { charityPollTotalRaised(); charityPollDonations(); }, CHARITY_POLL_INTERVAL_MS);
+
+const CHARITY_METADATA_POLL_INTERVAL_MS = 5 * 60 * 1000;
+async function charityPollIncentives() {
+  try {
+    const { body } = await extraLifeGet(CHARITY_INCENTIVES_URL);
+    if (Array.isArray(body)) {
+      charityState.incentives = body;
+      broadcastCharity({ type: 'incentivesUpdate', incentives: charityState.incentives });
+    }
+  } catch (e) { console.error('[charity] failed to fetch incentives:', e.message); }
+}
+setInterval(charityPollIncentives, CHARITY_METADATA_POLL_INTERVAL_MS);
+
+async function charityPollMilestones() {
+  try {
+    const { body } = await extraLifeGet(CHARITY_MILESTONES_URL);
+    if (!Array.isArray(body)) return;
+    charityState.milestones = body
+      .filter(m => m.isActive !== false && typeof m.fundraisingGoal === 'number' && typeof m.description === 'string')
+      .map(m => ({ amount: m.fundraisingGoal, label: m.description }))
+      .sort((a, b) => a.amount - b.amount);
+    charityState.reachedMilestones = new Set(charityState.milestones.filter(m => charityState.totalRaised >= m.amount).map(m => m.amount));
+    broadcastCharity({ type: 'milestonesUpdate', milestones: charitySerializeState().milestones });
+    saveCharityState();
+  } catch (e) { console.error('[charity] failed to fetch milestones:', e.message); }
+}
+setInterval(charityPollMilestones, CHARITY_METADATA_POLL_INTERVAL_MS);
+
+// Periodic donation-link reminder — only while actually live, so it never
+// fires into an empty/offline chat.
+setInterval(() => {
+  if (!streamLive) return;
+  sendChatMessage(`💝 Every dollar helps kids at Dayton Children's Hospital and adds time to the clock! Donate: ${CHARITY_DONATION_LINK_URL}`);
+}, CHARITY_DONATION_REMINDER_INTERVAL_MS);
+
+function charityStartPolling() {
+  charityPollTotalRaised();
+  charityPollDonations();
+  charityPollIncentives();
+  charityPollMilestones();
+  console.log(`[charity] Tracking Extra Life participant ${CHARITY_PARTICIPANT_ID}, goal $${CHARITY_GOAL_AMOUNT}`);
+}
+
+// ── Multer upload handlers (sound/image uploads from the admin panel) ──
+const charitySoundUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const charityImageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const CHARITY_IMAGE_EXT_BY_MIME = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg' };
+const CHARITY_AUDIO_EXT_BY_MIME = {
+  'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav',
+  'audio/wave': 'wav', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/webm': 'webm',
+};
+
 // ─── HTTP Server ─────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   const parsed   = url.parse(req.url, true);
@@ -2488,6 +2923,7 @@ const server = http.createServer(async (req, res) => {
         for (const client of sseClients) {
           try { client.write(data); } catch (e) { sseClients.delete(client); }
         }
+        broadcastCharity({ type: 'themeUpdate', theme });
         console.log(`[theme] Switched to: ${theme}`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, theme }));
@@ -2996,6 +3432,363 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /charity-discord-webhook-state ──────────────────────
+  if (pathname === '/charity-discord-webhook-state') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ url: integrations.charityDiscordWebhookUrl || '' }));
+    return;
+  }
+
+  // ── POST /charity-discord-webhook-set ───────────────────────
+  if (pathname === '/charity-discord-webhook-set' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { url: webhookUrl } = JSON.parse(body || '{}');
+        integrations.charityDiscordWebhookUrl = (webhookUrl || '').trim();
+        saveIntegrations();
+        console.log(`[charity] Discord webhook ${integrations.charityDiscordWebhookUrl ? 'set' : 'cleared'}`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── GET /charity/events (SSE) ────────────────────────────────
+  if (pathname === '/charity/events') {
+    res.writeHead(200, {
+      'Content-Type':  'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection':    'keep-alive',
+    });
+    res.write(`data: ${JSON.stringify({ type: 'state', ...charitySerializeState() })}\n\n`);
+    charitySseClients.add(res);
+    console.log(`[charity] SSE client connected — total: ${charitySseClients.size}`);
+    req.on('close', () => {
+      charitySseClients.delete(res);
+      console.log(`[charity] SSE client disconnected — total: ${charitySseClients.size}`);
+    });
+    return;
+  }
+
+  // ── GET /charity/state ───────────────────────────────────────
+  if (pathname === '/charity/state') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(charitySerializeState()));
+    return;
+  }
+
+  // ── GET /charity/donation-tiers ──────────────────────────────
+  if (pathname === '/charity/donation-tiers') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(charityDonationTiers));
+    return;
+  }
+
+  // ── GET /charity/asset-images ────────────────────────────────
+  if (pathname === '/charity/asset-images') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(charityAssetImages));
+    return;
+  }
+
+  // ── Charity timer controls ───────────────────────────────────
+  if (pathname === '/charity-timer-pause' && req.method === 'POST') {
+    charityState.timerPaused = true;
+    broadcastCharity({ type: 'timerTick', currentTimer: charityState.currentTimer, timerPaused: charityState.timerPaused });
+    saveCharityState();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, timerPaused: charityState.timerPaused }));
+    return;
+  }
+
+  if (pathname === '/charity-timer-resume' && req.method === 'POST') {
+    charityState.timerPaused = false;
+    charityState.scheduledStartAt = null;
+    broadcastCharity({ type: 'timerTick', currentTimer: charityState.currentTimer, timerPaused: charityState.timerPaused });
+    broadcastCharity({ type: 'scheduleUpdate', scheduledStartAt: null });
+    saveCharityState();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, timerPaused: charityState.timerPaused }));
+    return;
+  }
+
+  if (pathname === '/charity-timer-adjust' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const seconds = Number(JSON.parse(body || '{}').seconds);
+        if (!Number.isFinite(seconds)) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'seconds must be a number' })); return; }
+        charityState.currentTimer = Math.max(0, charityState.currentTimer + seconds);
+        broadcastCharity({ type: 'timerTick', currentTimer: charityState.currentTimer, timerPaused: charityState.timerPaused });
+        saveCharityState();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, currentTimer: charityState.currentTimer }));
+      } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    });
+    return;
+  }
+
+  if (pathname === '/charity-timer-reset' && req.method === 'POST') {
+    charityState.currentTimer = charityState.baseSeconds;
+    broadcastCharity({ type: 'timerTick', currentTimer: charityState.currentTimer, timerPaused: charityState.timerPaused });
+    saveCharityState();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, currentTimer: charityState.currentTimer }));
+    return;
+  }
+
+  if (pathname === '/charity-timer-base' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const hours = Number(JSON.parse(body || '{}').hours);
+        if (!Number.isFinite(hours) || hours <= 0) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'hours must be a positive number' })); return; }
+        charityState.baseSeconds = Math.round(hours * 3600);
+        console.log(`[charity] base duration set to ${hours}h (${charityState.baseSeconds}s)`);
+        broadcastCharity({ type: 'baseUpdate', baseSeconds: charityState.baseSeconds });
+        saveCharityState();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, baseSeconds: charityState.baseSeconds }));
+      } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    });
+    return;
+  }
+
+  if (pathname === '/charity-timer-schedule' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { startAt } = JSON.parse(body || '{}');
+        const date = new Date(startAt);
+        if (!startAt || Number.isNaN(date.getTime())) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'startAt must be a valid date/time' })); return; }
+        charityState.scheduledStartAt = date.toISOString();
+        charityState.timerPaused = true;
+        console.log(`[charity] scheduled auto-resume at ${charityState.scheduledStartAt}`);
+        broadcastCharity({ type: 'timerTick', currentTimer: charityState.currentTimer, timerPaused: charityState.timerPaused });
+        broadcastCharity({ type: 'scheduleUpdate', scheduledStartAt: charityState.scheduledStartAt });
+        saveCharityState();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, scheduledStartAt: charityState.scheduledStartAt, timerPaused: charityState.timerPaused }));
+      } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    });
+    return;
+  }
+
+  if (pathname === '/charity-timer-schedule-clear' && req.method === 'POST') {
+    charityState.scheduledStartAt = null;
+    broadcastCharity({ type: 'scheduleUpdate', scheduledStartAt: null });
+    saveCharityState();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  if (pathname === '/charity-timer-bonus-time' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        charityState.bonusTimeActive = !!JSON.parse(body || '{}').enabled;
+        console.log(`[charity] bonus time ${charityState.bonusTimeActive ? 'enabled' : 'disabled'}`);
+        broadcastCharity({ type: 'bonusTimeUpdate', bonusTimeActive: charityState.bonusTimeActive });
+        saveCharityState();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, bonusTimeActive: charityState.bonusTimeActive }));
+      } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    });
+    return;
+  }
+
+  if (pathname === '/charity-timer-time-additions' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        charityState.timeAdditionsEnabled = !!JSON.parse(body || '{}').enabled;
+        console.log(`[charity] time additions ${charityState.timeAdditionsEnabled ? 'enabled' : 'disabled'}`);
+        broadcastCharity({ type: 'timeAdditionsUpdate', timeAdditionsEnabled: charityState.timeAdditionsEnabled });
+        saveCharityState();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, timeAdditionsEnabled: charityState.timeAdditionsEnabled }));
+      } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    });
+    return;
+  }
+
+  if (pathname === '/charity-timer-visibility' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        charityState.timerVisible = !!JSON.parse(body || '{}').enabled;
+        console.log(`[charity] timer panel ${charityState.timerVisible ? 'shown' : 'hidden'}`);
+        broadcastCharity({ type: 'timerVisibilityUpdate', timerVisible: charityState.timerVisible });
+        saveCharityState();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, timerVisible: charityState.timerVisible }));
+      } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    });
+    return;
+  }
+
+  // ── Charity giveaway ($5+ donations) ─────────────────────────
+  if (pathname === '/charity-giveaway-draw' && req.method === 'POST') {
+    const winner = charityDrawGiveawayWinner();
+    if (!winner) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'No giveaway entrants yet' })); return; }
+    console.log(`[charity] giveaway drawn: ${winner.name} (${winner.entries}/${winner.totalEntries} entries)`);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, winner }));
+    return;
+  }
+
+  if (pathname === '/charity-giveaway-remove' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { name } = JSON.parse(body || '{}');
+        if (!name || !Object.prototype.hasOwnProperty.call(charityState.giveawayEntries, name)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Unknown entrant' })); return;
+        }
+        delete charityState.giveawayEntries[name];
+        saveCharityState();
+        broadcastCharity({ type: 'giveawayUpdate', giveawayEntries: charitySerializeGiveawayEntries() });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, giveawayEntries: charitySerializeGiveawayEntries() }));
+      } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    });
+    return;
+  }
+
+  // ── Charity test alerts (visual/audio preview only) ──────────
+  if (pathname === '/charity-test-donation' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const b = JSON.parse(body || '{}');
+        const name = typeof b.name === 'string' && b.name.trim() ? b.name.trim() : 'TestDonor';
+        const amount = Number(b.amount);
+        if (!Number.isFinite(amount) || amount <= 0) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'amount must be a positive number' })); return; }
+        broadcastCharity({ type: 'newDonation', name, amount, test: true });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    });
+    return;
+  }
+
+  if (pathname === '/charity-test-milestone' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const b = JSON.parse(body || '{}');
+        const amount = Number(b.amount);
+        const label = typeof b.label === 'string' && b.label.trim() ? b.label.trim() : 'Test milestone';
+        if (!Number.isFinite(amount) || amount <= 0) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'amount must be a positive number' })); return; }
+        broadcastCharity({ type: 'milestoneReached', amount, label, test: true });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    });
+    return;
+  }
+
+  // ── Charity sound upload (donation tiers) ────────────────────
+  if (pathname === '/charity-upload-sound' && req.method === 'POST') {
+    charitySoundUpload.array('files', 20)(req, res, (err) => {
+      if (err) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message })); return; }
+      const tierId = req.body && req.body.tier;
+      const files = req.files || [];
+      if (!files.length) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'No files uploaded' })); return; }
+
+      const tier = charityDonationTiers.find(t => t.id === tierId);
+      if (!tier) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: `Unknown tier "${tierId}"` })); return; }
+
+      const safeTierId = path.basename(tierId);
+      const errors = [];
+      let addedCount = 0;
+      fs.mkdirSync(CHARITY_SOUNDS_DIR, { recursive: true });
+
+      for (const file of files) {
+        const ext = CHARITY_AUDIO_EXT_BY_MIME[file.mimetype];
+        if (!ext) { errors.push({ name: file.originalname, error: 'Must be an MP3, WAV, OGG, M4A, or WebM audio file' }); continue; }
+        const suffix = crypto.randomBytes(4).toString('hex');
+        const filename = `donation-tier-${safeTierId}-${suffix}.${ext}`;
+        fs.writeFileSync(path.join(CHARITY_SOUNDS_DIR, filename), file.buffer);
+        tier.sounds.push({ path: `Assets/Sounds/${filename}`, name: file.originalname || filename });
+        addedCount += 1;
+      }
+      saveCharityDonationTiers();
+      console.log(`[charity] added ${addedCount}/${files.length} sound(s) for ${tierId} (${tier.sounds.length} total)`);
+      broadcastCharity({ type: 'donationTiersUpdate', donationTiers: charityDonationTiers });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, tier: tierId, sounds: tier.sounds, added: addedCount, errors }));
+    });
+    return;
+  }
+
+  if (pathname === '/charity-remove-sound' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { tier: tierId, sound: soundPath } = JSON.parse(body || '{}');
+        const tier = charityDonationTiers.find(t => t.id === tierId);
+        if (!tier || !tier.sounds.some(s => s.path === soundPath)) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Unknown tier or sound' })); return; }
+        tier.sounds = tier.sounds.filter(s => s.path !== soundPath);
+        saveCharityDonationTiers();
+        const filePath = path.join(CHARITY_SOUNDS_DIR, path.basename(soundPath));
+        fs.rm(filePath, { force: true }, () => {});
+        console.log(`[charity] removed sound for ${tierId}: ${soundPath} (${tier.sounds.length} remaining)`);
+        broadcastCharity({ type: 'donationTiersUpdate', donationTiers: charityDonationTiers });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, tier: tierId, sounds: tier.sounds }));
+      } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })); }
+    });
+    return;
+  }
+
+  // ── Charity image upload (QR code / logo asset boxes) ────────
+  if (pathname === '/charity-upload-image' && req.method === 'POST') {
+    charityImageUpload.single('file')(req, res, (err) => {
+      if (err) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message })); return; }
+      const assetId = req.body && req.body.asset;
+      if (!req.file) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'No file uploaded' })); return; }
+      const ext = CHARITY_IMAGE_EXT_BY_MIME[req.file.mimetype];
+      if (!ext) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'File must be a PNG, JPEG, GIF, WebP, or SVG image' })); return; }
+
+      const asset = charityAssetImages.find(a => a.id === assetId);
+      if (!asset) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: `Unknown asset "${assetId}"` })); return; }
+
+      const safeId = path.basename(assetId);
+      fs.mkdirSync(CHARITY_IMAGES_DIR, { recursive: true });
+      for (const existing of fs.readdirSync(CHARITY_IMAGES_DIR)) {
+        if (existing.startsWith(`${safeId}.`)) fs.unlinkSync(path.join(CHARITY_IMAGES_DIR, existing));
+      }
+      const filename = `${safeId}.${ext}`;
+      fs.writeFileSync(path.join(CHARITY_IMAGES_DIR, filename), req.file.buffer);
+      const relativePath = `Assets/Images/${filename}`;
+      asset.file = relativePath;
+      saveCharityAssetImages();
+      console.log(`[charity] uploaded image for ${assetId}: ${filename} (${req.file.size} bytes)`);
+      broadcastCharity({ type: 'assetImagesUpdate', assetImages: charityAssetImages });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, asset: assetId, path: relativePath }));
+    });
+    return;
+  }
+
   // ── GET /ad-schedule-state ──────────────────────────────────
   if (pathname === '/ad-schedule-state') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -3174,6 +3967,8 @@ const server = http.createServer(async (req, res) => {
     '.mp3':  'audio/mpeg',
     '.wav':  'audio/wav',
     '.ogg':  'audio/ogg',
+    '.m4a':  'audio/mp4',
+    '.webm': 'audio/webm',
     '.ico':  'image/x-icon',
     '.ttf':   'font/ttf',
     '.woff':  'font/woff',
@@ -3221,6 +4016,8 @@ loadButtonState();
 loadKaraokeQueueState();
 loadIntegrations();
 loadModTimerState();
+loadCharityDonationTiers();
+loadCharityAssetImages();
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[nom-token-broker] Running on http://${SERVER_IP}:${PORT}`);
   if (tokenStore.refreshToken) {
@@ -3239,4 +4036,5 @@ server.listen(PORT, '0.0.0.0', () => {
   pollAdSchedule();
   setInterval(pollAdSchedule, 60000);
   startFourthwallPolling();
+  charityStartPolling();
 });

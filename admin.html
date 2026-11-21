@@ -483,6 +483,7 @@
   <button class="tab-btn active" id="tab-btn-main"     onclick="switchAdminTab('main')">Main</button>
   <button class="tab-btn"        id="tab-btn-karaoke"  onclick="switchAdminTab('karaoke')">🎤 Karaoke</button>
   <button class="tab-btn"        id="tab-btn-giveaway" onclick="switchAdminTab('giveaway')">🎉 Giveaway</button>
+  <button class="tab-btn"        id="tab-btn-charity"  onclick="switchAdminTab('charity')">💰 Charity</button>
 </div>
 
 <main id="tab-main">
@@ -1183,6 +1184,155 @@
 
 </main>
 
+<main id="tab-charity" style="display:none;">
+
+  <div class="panel full">
+    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>💰 Charity Donothon — Timer</span>
+      <span id="ch-status-badge" style="font-size:11px;font-style:italic;color:var(--dark-muted);">—</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div class="token-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
+        <span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dark-muted);">Countdown</span>
+        <span id="ch-timer" style="font-family:'Cinzel',serif;font-size:22px;color:var(--amber);">--:--:--</span>
+      </div>
+      <div class="token-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
+        <span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dark-muted);">Raised / Goal</span>
+        <span id="ch-total" style="font-family:'Cinzel',serif;font-size:22px;color:var(--amber);">$0 / $0</span>
+      </div>
+    </div>
+
+    <div class="token-row" style="justify-content:space-between;margin-bottom:14px;">
+      <span>Latest donor</span>
+      <span id="ch-latest-donor" style="color:var(--amber);">—</span>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <button onclick="chTimerPause()" style="flex:1;padding:10px;">⏸ Pause</button>
+      <button onclick="chTimerResume()" style="flex:1;padding:10px;">▶ Resume</button>
+      <button onclick="chTimerReset()" class="danger" style="flex:1;padding:10px;">↺ Reset</button>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <button onclick="chTimerAdjust(-600)" style="flex:1;padding:8px;">-10m</button>
+      <button onclick="chTimerAdjust(-60)" style="flex:1;padding:8px;">-1m</button>
+      <button onclick="chTimerAdjust(60)" style="flex:1;padding:8px;">+1m</button>
+      <button onclick="chTimerAdjust(600)" style="flex:1;padding:8px;">+10m</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;margin-bottom:12px;">
+      <div class="field" style="margin:0;">
+        <label>Custom Adjustment (seconds, negative to subtract)</label>
+        <input id="ch-custom-seconds" type="number" placeholder="e.g. 120 or -120" />
+      </div>
+      <button onclick="chTimerCustomAdjust()" style="height:38px;padding:0 16px;margin-bottom:0;">Apply</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;margin-bottom:12px;">
+      <div class="field" style="margin:0;">
+        <label>Base Duration (hours) — what Reset returns to</label>
+        <input id="ch-base-hours" type="number" step="0.5" min="0.5" placeholder="e.g. 8" />
+      </div>
+      <button onclick="chSaveBaseHours()" style="height:38px;padding:0 16px;margin-bottom:0;">Save</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;align-items:end;margin-bottom:4px;">
+      <div class="field" style="margin:0;">
+        <label>Auto-Resume At (local time)</label>
+        <input id="ch-schedule-input" type="datetime-local" />
+      </div>
+      <button onclick="chSetSchedule()" style="height:38px;padding:0 10px;margin-bottom:0;">Set</button>
+      <button onclick="chClearSchedule()" style="height:38px;padding:0 10px;margin-bottom:0;">Clear</button>
+    </div>
+    <div id="ch-schedule-status" style="font-size:11px;color:var(--dark-muted);font-style:italic;margin:0 0 12px;"></div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;padding:10px;background:rgba(0,0,0,0.2);border-radius:3px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:12px;">
+        <input type="checkbox" id="ch-bonus-time" style="width:16px;height:16px;cursor:pointer;" onchange="chToggleBonusTime()">
+        Bonus time (donations add 5 min/$ instead of 2 min/$)
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:12px;">
+        <input type="checkbox" id="ch-time-additions" style="width:16px;height:16px;cursor:pointer;" onchange="chToggleTimeAdditions()">
+        Donations add time to the timer
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:12px;">
+        <input type="checkbox" id="ch-timer-visible" style="width:16px;height:16px;cursor:pointer;" onchange="chToggleTimerVisibility()">
+        Show timer panel on overlay
+      </label>
+    </div>
+  </div>
+
+  <div class="panel full">
+    <div class="panel-title">Test Alerts</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:end;margin-bottom:12px;">
+      <div class="field" style="margin:0;"><label>Donor Name</label><input id="ch-test-donor-name" type="text" placeholder="TestHero" /></div>
+      <div class="field" style="margin:0;"><label>Amount</label><input id="ch-test-donor-amount" type="number" placeholder="42" /></div>
+      <button onclick="chTestDonation()" style="height:38px;padding:0 16px;margin-bottom:0;">🎉 Fire Test Donation</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:end;">
+      <div class="field" style="margin:0;"><label>Milestone Amount</label><input id="ch-test-milestone-amount" type="number" placeholder="500" /></div>
+      <div class="field" style="margin:0;"><label>Milestone Label</label><input id="ch-test-milestone-label" type="text" placeholder="Goal reached!" /></div>
+      <button onclick="chTestMilestone()" style="height:38px;padding:0 16px;margin-bottom:0;">🏆 Fire Test Milestone</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Milestones <span style="color:var(--dark-muted);font-style:italic;text-transform:none;letter-spacing:0;">(read-only, from Extra Life)</span></div>
+    <div id="ch-milestones-list" style="display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto;"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Incentives <span style="color:var(--dark-muted);font-style:italic;text-transform:none;letter-spacing:0;">(read-only, from Extra Life)</span></div>
+    <div id="ch-incentives-list" style="display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto;"></div>
+  </div>
+
+  <div class="panel full">
+    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>🎁 Donation Giveaway ($5+ entries)</span>
+      <span>Total entries: <strong id="ch-giveaway-total">0</strong></span>
+    </div>
+    <p style="font-family:'Crimson Pro',serif;font-size:13px;color:var(--dark-muted);margin-bottom:10px;font-style:italic;">
+      $5 donated = 1 entry, stacking across the whole campaign. Drawing a winner doesn't remove them from the pool, so re-drawing is safe.
+    </p>
+    <div id="ch-giveaway-list" style="max-height:220px;overflow-y:auto;margin-bottom:12px;display:flex;flex-direction:column;gap:4px;"></div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button onclick="chDrawGiveawayWinner()" style="flex:1;padding:10px;">🎲 Draw Winner</button>
+      <span id="ch-giveaway-winner" style="color:var(--amber);font-size:13px;"></span>
+    </div>
+  </div>
+
+  <div class="panel full">
+    <div class="panel-title">🔊 Donation Alert Sounds</div>
+    <p style="font-family:'Crimson Pro',serif;font-size:13px;color:var(--dark-muted);margin-bottom:10px;font-style:italic;">
+      Each tier can have multiple sounds — the overlay picks one at random per alert.
+    </p>
+    <div id="ch-tiers-list"></div>
+  </div>
+
+  <div class="panel full">
+    <div class="panel-title">🖼️ Asset Images</div>
+    <p style="font-family:'Crimson Pro',serif;font-size:13px;color:var(--dark-muted);margin-bottom:10px;font-style:italic;">
+      QR code and logos shown in the top-right boxes on the overlay.
+    </p>
+    <div id="ch-assets-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+
+  <div class="panel full">
+    <div style="font-family:'Cinzel',serif;font-size:9px;letter-spacing:.15em;color:var(--amber);margin-bottom:12px;text-transform:uppercase;">Discord Webhook (donation announcements)</div>
+    <div style="display:grid;grid-template-columns:3fr 1fr;gap:12px;align-items:end;">
+      <div class="field" style="margin:0;">
+        <label>Webhook URL</label>
+        <input id="ch-discord-webhook-input" type="text" placeholder="https://discord.com/api/webhooks/..." />
+      </div>
+      <button onclick="chSaveDiscordWebhook()" style="height:38px;padding:0 16px;margin-bottom:0;">
+        <span class="icon">💾</span> Save
+      </button>
+    </div>
+  </div>
+
+</main>
+
 <div id="toast"></div>
 
 <script>
@@ -1196,9 +1346,11 @@ function switchAdminTab(name) {
   document.getElementById('tab-main').style.display     = name === 'main'     ? '' : 'none';
   document.getElementById('tab-karaoke').style.display   = name === 'karaoke'  ? '' : 'none';
   document.getElementById('tab-giveaway').style.display  = name === 'giveaway' ? '' : 'none';
+  document.getElementById('tab-charity').style.display   = name === 'charity'  ? '' : 'none';
   document.getElementById('tab-btn-main').classList.toggle('active',     name === 'main');
   document.getElementById('tab-btn-karaoke').classList.toggle('active',  name === 'karaoke');
   document.getElementById('tab-btn-giveaway').classList.toggle('active', name === 'giveaway');
+  document.getElementById('tab-btn-charity').classList.toggle('active',  name === 'charity');
 }
 
 // ─── Karaoke Queue ────────────────────────────────────────────────────────────
@@ -2644,6 +2796,394 @@ async function fetchModTimerState() {
   } catch (e) {}
 }
 
+// ─── Charity Donothon ────────────────────────────────────────────────────────
+let chGoal = 0;
+let chTiers = [];
+let chAssets = [];
+
+function chFormatMoney(amount) {
+  return `$${Math.round(Number(amount) || 0).toLocaleString('en-US')}`;
+}
+
+function chFormatTimer(totalSeconds) {
+  const s = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(h)}:${pad(m)}:${pad(sec)}`;
+}
+
+let chSse;
+function chConnectSSE() {
+  if (chSse) chSse.close();
+  chSse = new EventSource(`${OVERLAY_URL}/charity/events`);
+  chSse.onmessage = (ev) => {
+    let data;
+    try { data = JSON.parse(ev.data); } catch { return; }
+    switch (data.type) {
+      case 'state':
+        chGoal = data.goal;
+        chRenderTimer(data.currentTimer, data.timerPaused);
+        chRenderTotal(data.totalRaised, data.goal);
+        chRenderLatestDonor(data.latestDonorName, data.latestDonorAmount);
+        chRenderBase(data.baseSeconds);
+        chRenderSchedule(data.scheduledStartAt);
+        document.getElementById('ch-bonus-time').checked     = !!data.bonusTimeActive;
+        document.getElementById('ch-time-additions').checked = data.timeAdditionsEnabled !== false;
+        document.getElementById('ch-timer-visible').checked  = data.timerVisible !== false;
+        chRenderMilestones(data.milestones);
+        chRenderIncentives(data.incentives);
+        chRenderGiveaway(data.giveawayEntries);
+        break;
+      case 'timerTick':       chRenderTimer(data.currentTimer, data.timerPaused); break;
+      case 'totalUpdate':     chGoal = data.goal; chRenderTotal(data.totalRaised, data.goal); break;
+      case 'newDonation':     chRenderLatestDonor(data.name, data.amount); break;
+      case 'baseUpdate':      chRenderBase(data.baseSeconds); break;
+      case 'scheduleUpdate':  chRenderSchedule(data.scheduledStartAt); break;
+      case 'bonusTimeUpdate': document.getElementById('ch-bonus-time').checked = !!data.bonusTimeActive; break;
+      case 'timeAdditionsUpdate': document.getElementById('ch-time-additions').checked = !!data.timeAdditionsEnabled; break;
+      case 'timerVisibilityUpdate': document.getElementById('ch-timer-visible').checked = !!data.timerVisible; break;
+      case 'milestonesUpdate':    chRenderMilestones(data.milestones); break;
+      case 'incentivesUpdate':    chRenderIncentives(data.incentives); break;
+      case 'giveawayUpdate':      chRenderGiveaway(data.giveawayEntries); break;
+      case 'donationTiersUpdate': chTiers = data.donationTiers; chRenderTiers(); break;
+      case 'assetImagesUpdate':   chAssets = data.assetImages; chRenderAssets(); break;
+    }
+  };
+  chSse.onerror = () => {
+    chSse.close();
+    setTimeout(chConnectSSE, 3000);
+  };
+}
+
+function chRenderTimer(seconds, paused) {
+  document.getElementById('ch-timer').textContent = chFormatTimer(seconds);
+  document.getElementById('ch-status-badge').textContent = paused ? 'Paused' : 'Running';
+}
+
+function chRenderTotal(totalRaised, goal) {
+  document.getElementById('ch-total').textContent = `${chFormatMoney(totalRaised)} / ${chFormatMoney(goal)}`;
+}
+
+function chRenderLatestDonor(name, amount) {
+  if (!name) return;
+  document.getElementById('ch-latest-donor').textContent = `${name} — ${chFormatMoney(amount)}`;
+}
+
+function chRenderBase(baseSeconds) {
+  const hours = (Number(baseSeconds) || 0) / 3600;
+  document.getElementById('ch-base-hours').value = Math.round(hours * 100) / 100;
+}
+
+function chRenderSchedule(scheduledStartAt) {
+  const el = document.getElementById('ch-schedule-status');
+  el.textContent = scheduledStartAt
+    ? `Scheduled to auto-resume at ${new Date(scheduledStartAt).toLocaleString()}`
+    : 'No auto-resume scheduled.';
+}
+
+function chRenderMilestones(milestones) {
+  const list = document.getElementById('ch-milestones-list');
+  const items = milestones || [];
+  list.innerHTML = items.length
+    ? items.map(m => `
+      <div class="token-row" style="justify-content:space-between;padding:6px 10px;${m.reached ? 'border-color:var(--amber);' : ''}">
+        <span style="font-size:12px;">${kqEsc(m.label)}</span>
+        <span style="font-size:12px;color:${m.reached ? 'var(--amber)' : 'var(--dark-muted)'};">${chFormatMoney(m.amount)}${m.reached ? ' ✓' : ''}</span>
+      </div>`).join('')
+    : '<div style="font-size:11px;color:var(--dark-muted);font-style:italic;">No milestones found.</div>';
+}
+
+function chRenderIncentives(incentives) {
+  const list = document.getElementById('ch-incentives-list');
+  const items = incentives || [];
+  list.innerHTML = items.length
+    ? items.map(i => `
+      <div class="token-row" style="justify-content:space-between;padding:6px 10px;${i.isActive === false ? 'opacity:.5;' : ''}">
+        <span style="font-size:12px;">${kqEsc(i.description || '')}</span>
+        <span style="font-size:12px;color:var(--dark-muted);">${typeof i.amount === 'number' ? chFormatMoney(i.amount) : ''}${typeof i.quantity === 'number' ? ` · ${i.quantityClaimed || 0}/${i.quantity}` : ''}</span>
+      </div>`).join('')
+    : '<div style="font-size:11px;color:var(--dark-muted);font-style:italic;">No incentives found.</div>';
+}
+
+function chRenderGiveaway(entries) {
+  const list = document.getElementById('ch-giveaway-list');
+  const items = entries || [];
+  document.getElementById('ch-giveaway-total').textContent = items.reduce((sum, e) => sum + e.entries, 0);
+  list.innerHTML = items.length
+    ? items.map(e => `
+      <div class="token-row" style="justify-content:space-between;padding:4px 8px;background:rgba(0,0,0,0.2);border-radius:3px;">
+        <span style="font-size:12px;">${kqEsc(e.name)} <span style="color:var(--dark-muted);">×${e.entries}</span></span>
+        <button onclick="chRemoveGiveawayEntrant('${kqEsc(e.name)}')" class="danger" style="padding:2px 8px;font-size:10px;">✕</button>
+      </div>`).join('')
+    : '<div style="font-size:11px;color:var(--dark-muted);font-style:italic;">No entries yet</div>';
+}
+
+async function chTimerPause() {
+  try { await fetch(`${OVERLAY_URL}/charity-timer-pause`, { method: 'POST' }); addLog('Charity timer paused', 'ok'); }
+  catch (e) { addLog(`Charity timer error: ${e.message}`, 'error'); }
+}
+
+async function chTimerResume() {
+  try { await fetch(`${OVERLAY_URL}/charity-timer-resume`, { method: 'POST' }); addLog('Charity timer resumed', 'ok'); }
+  catch (e) { addLog(`Charity timer error: ${e.message}`, 'error'); }
+}
+
+async function chTimerReset() {
+  if (!confirm('Reset the charity timer back to its base duration?')) return;
+  try { await fetch(`${OVERLAY_URL}/charity-timer-reset`, { method: 'POST' }); addLog('Charity timer reset', 'ok'); }
+  catch (e) { addLog(`Charity timer error: ${e.message}`, 'error'); }
+}
+
+async function chTimerAdjust(seconds) {
+  try {
+    await fetch(`${OVERLAY_URL}/charity-timer-adjust`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seconds }),
+    });
+    addLog(`Charity timer adjusted by ${seconds}s`, 'ok');
+  } catch (e) { addLog(`Charity timer error: ${e.message}`, 'error'); }
+}
+
+async function chTimerCustomAdjust() {
+  const input = document.getElementById('ch-custom-seconds');
+  const seconds = Number(input.value);
+  if (!Number.isFinite(seconds) || seconds === 0) { addLog('Enter a nonzero number of seconds', 'warn'); return; }
+  await chTimerAdjust(seconds);
+  input.value = '';
+}
+
+async function chSaveBaseHours() {
+  const hours = Number(document.getElementById('ch-base-hours').value);
+  if (!Number.isFinite(hours) || hours <= 0) { addLog('Enter a positive number of hours', 'warn'); return; }
+  try {
+    const res = await fetch(`${OVERLAY_URL}/charity-timer-base`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hours }),
+    });
+    if (res.ok) addLog(`Charity base duration set to ${hours}h`, 'ok');
+    else addLog('Charity base duration save failed', 'error');
+  } catch (e) { addLog(`Charity base duration error: ${e.message}`, 'error'); }
+}
+
+async function chSetSchedule() {
+  const input = document.getElementById('ch-schedule-input');
+  if (!input.value) { addLog('Pick a date/time first', 'warn'); return; }
+  const startAt = new Date(input.value).toISOString();
+  try {
+    const res = await fetch(`${OVERLAY_URL}/charity-timer-schedule`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startAt }),
+    });
+    if (res.ok) addLog('Charity auto-resume scheduled', 'ok');
+    else addLog('Charity schedule save failed', 'error');
+  } catch (e) { addLog(`Charity schedule error: ${e.message}`, 'error'); }
+}
+
+async function chClearSchedule() {
+  try { await fetch(`${OVERLAY_URL}/charity-timer-schedule-clear`, { method: 'POST' }); addLog('Charity schedule cleared', 'ok'); }
+  catch (e) { addLog(`Charity schedule error: ${e.message}`, 'error'); }
+}
+
+async function chToggleBonusTime() {
+  const enabled = document.getElementById('ch-bonus-time').checked;
+  try {
+    await fetch(`${OVERLAY_URL}/charity-timer-bonus-time`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }),
+    });
+    addLog(`Charity bonus time ${enabled ? 'enabled' : 'disabled'}`, 'ok');
+  } catch (e) { addLog(`Charity bonus time error: ${e.message}`, 'error'); }
+}
+
+async function chToggleTimeAdditions() {
+  const enabled = document.getElementById('ch-time-additions').checked;
+  try {
+    await fetch(`${OVERLAY_URL}/charity-timer-time-additions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }),
+    });
+    addLog(`Charity time additions ${enabled ? 'enabled' : 'disabled'}`, 'ok');
+  } catch (e) { addLog(`Charity time additions error: ${e.message}`, 'error'); }
+}
+
+async function chToggleTimerVisibility() {
+  const enabled = document.getElementById('ch-timer-visible').checked;
+  try {
+    await fetch(`${OVERLAY_URL}/charity-timer-visibility`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }),
+    });
+    addLog(`Charity timer panel ${enabled ? 'shown' : 'hidden'}`, 'ok');
+  } catch (e) { addLog(`Charity timer visibility error: ${e.message}`, 'error'); }
+}
+
+async function chTestDonation() {
+  const name   = document.getElementById('ch-test-donor-name').value.trim() || 'TestHero';
+  const amount = Number(document.getElementById('ch-test-donor-amount').value);
+  if (!Number.isFinite(amount) || amount <= 0) { addLog('Enter a positive test amount', 'warn'); return; }
+  try {
+    const res = await fetch(`${OVERLAY_URL}/charity-test-donation`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, amount }),
+    });
+    if (res.ok) addLog(`Test donation fired: ${name} — ${chFormatMoney(amount)}`, 'ok');
+    else addLog('Test donation failed', 'error');
+  } catch (e) { addLog(`Test donation error: ${e.message}`, 'error'); }
+}
+
+async function chTestMilestone() {
+  const amount = Number(document.getElementById('ch-test-milestone-amount').value);
+  const label  = document.getElementById('ch-test-milestone-label').value.trim() || 'Test milestone';
+  if (!Number.isFinite(amount) || amount <= 0) { addLog('Enter a positive milestone amount', 'warn'); return; }
+  try {
+    const res = await fetch(`${OVERLAY_URL}/charity-test-milestone`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, label }),
+    });
+    if (res.ok) addLog(`Test milestone fired: ${chFormatMoney(amount)} — ${label}`, 'ok');
+    else addLog('Test milestone failed', 'error');
+  } catch (e) { addLog(`Test milestone error: ${e.message}`, 'error'); }
+}
+
+async function chDrawGiveawayWinner() {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/charity-giveaway-draw`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      document.getElementById('ch-giveaway-winner').textContent = `🏆 ${data.winner.name} (${data.winner.entries}/${data.winner.totalEntries})`;
+      addLog(`Charity giveaway winner drawn: ${data.winner.name}`, 'ok');
+    } else {
+      addLog(`Charity giveaway draw failed: ${data.error || 'no entries'}`, 'warn');
+    }
+  } catch (e) { addLog(`Charity giveaway draw error: ${e.message}`, 'error'); }
+}
+
+async function chRemoveGiveawayEntrant(name) {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/charity-giveaway-remove`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (res.ok) addLog(`Removed charity giveaway entrant: ${name}`, 'ok');
+    else addLog(`Remove entrant failed: ${data.error || 'unknown error'}`, 'warn');
+  } catch (e) { addLog(`Charity giveaway remove error: ${e.message}`, 'error'); }
+}
+
+async function fetchCharityTiers() {
+  try {
+    const res = await fetch(`${OVERLAY_URL}/charity/donation-tiers`);
+    if (!res.ok) return;
+    chTiers = await res.json();
+    chRenderTiers();
+  } catch (e) {}
+}
+
+function chRenderTiers() {
+  const container = document.getElementById('ch-tiers-list');
+  container.innerHTML = chTiers.map(tier => `
+    <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #B8782022;">
+      <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:8px;align-items:center;margin-bottom:8px;">
+        <strong style="font-size:13px;">${kqEsc(tier.label || tier.id)} <span style="color:var(--dark-muted);font-weight:normal;">(${chFormatMoney(tier.minAmount)}+)</span></strong>
+        <input type="file" multiple accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/webm,.mp3,.wav,.ogg,.m4a,.webm" id="ch-tier-file-${kqEsc(tier.id)}" style="font-size:11px;">
+        <button onclick="chUploadTierSounds('${kqEsc(tier.id)}')" style="padding:6px 12px;">Upload</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        ${(tier.sounds || []).length
+          ? tier.sounds.map(s => `
+            <div class="token-row" style="justify-content:space-between;padding:4px 8px;background:rgba(0,0,0,0.2);border-radius:3px;">
+              <span style="font-size:12px;">${kqEsc(s.name)}</span>
+              <button onclick="chRemoveTierSound('${kqEsc(tier.id)}','${kqEsc(s.path)}')" class="danger" style="padding:2px 8px;font-size:10px;">✕</button>
+            </div>`).join('')
+          : '<div style="font-size:11px;color:var(--dark-muted);font-style:italic;">No sounds yet — alerts for this tier will be silent.</div>'}
+      </div>
+    </div>`).join('');
+}
+
+async function chUploadTierSounds(tierId) {
+  const input = document.getElementById(`ch-tier-file-${tierId}`);
+  const files = input.files;
+  if (!files || !files.length) { addLog('Choose one or more sound files first', 'warn'); return; }
+  const formData = new FormData();
+  formData.append('tier', tierId);
+  for (const f of files) formData.append('files', f);
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/charity-upload-sound`, { method: 'POST', body: formData });
+    const data = await res.json();
+    if (res.ok) {
+      addLog(`Uploaded ${data.added} sound(s) to ${tierId}`, 'ok');
+      input.value = '';
+      fetchCharityTiers();
+    } else {
+      addLog(`Sound upload failed: ${data.error || 'unknown error'}`, 'error');
+    }
+  } catch (e) { addLog(`Sound upload error: ${e.message}`, 'error'); }
+}
+
+async function chRemoveTierSound(tierId, soundPath) {
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/charity-remove-sound`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tier: tierId, sound: soundPath }),
+    });
+    const data = await res.json();
+    if (res.ok) { addLog('Sound removed', 'ok'); fetchCharityTiers(); }
+    else addLog(`Remove sound failed: ${data.error || 'unknown error'}`, 'warn');
+  } catch (e) { addLog(`Remove sound error: ${e.message}`, 'error'); }
+}
+
+async function fetchCharityAssetImages() {
+  try {
+    const res = await fetch(`${OVERLAY_URL}/charity/asset-images`);
+    if (!res.ok) return;
+    chAssets = await res.json();
+    chRenderAssets();
+  } catch (e) {}
+}
+
+function chRenderAssets() {
+  const container = document.getElementById('ch-assets-list');
+  container.innerHTML = chAssets.map(asset => `
+    <div style="display:flex;align-items:center;gap:12px;">
+      <img src="${asset.file ? `${OVERLAY_URL}/${asset.file}` : ''}" style="width:44px;height:44px;object-fit:contain;background:rgba(0,0,0,.3);border-radius:4px;border:1px solid #B8782033;">
+      <strong style="flex:1;font-size:13px;">${kqEsc(asset.label || asset.id)}</strong>
+      <input type="file" id="ch-asset-file-${kqEsc(asset.id)}" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" style="font-size:11px;">
+      <button onclick="chUploadAssetImage('${kqEsc(asset.id)}')" style="padding:6px 12px;">Upload</button>
+    </div>`).join('');
+}
+
+async function chUploadAssetImage(assetId) {
+  const input = document.getElementById(`ch-asset-file-${assetId}`);
+  const file  = input.files && input.files[0];
+  if (!file) { addLog('Choose an image file first', 'warn'); return; }
+  const formData = new FormData();
+  formData.append('asset', assetId);
+  formData.append('file', file);
+  try {
+    const res  = await fetch(`${OVERLAY_URL}/charity-upload-image`, { method: 'POST', body: formData });
+    const data = await res.json();
+    if (res.ok) {
+      addLog(`Uploaded image for ${assetId}`, 'ok');
+      input.value = '';
+      fetchCharityAssetImages();
+    } else {
+      addLog(`Image upload failed: ${data.error || 'unknown error'}`, 'error');
+    }
+  } catch (e) { addLog(`Image upload error: ${e.message}`, 'error'); }
+}
+
+async function chSaveDiscordWebhook() {
+  const url = document.getElementById('ch-discord-webhook-input').value.trim();
+  try {
+    const res = await fetch(`${OVERLAY_URL}/charity-discord-webhook-set`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }),
+    });
+    if (res.ok) addLog(url ? 'Charity Discord webhook saved' : 'Charity Discord webhook cleared', 'ok');
+    else addLog('Charity Discord webhook save failed', 'error');
+  } catch (e) { addLog(`Charity Discord webhook error: ${e.message}`, 'error'); }
+}
+
+async function fetchCharityDiscordWebhook() {
+  try {
+    const res = await fetch(`${OVERLAY_URL}/charity-discord-webhook-state`);
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('ch-discord-webhook-input').value = data.url || '';
+  } catch (e) {}
+}
+
 // ─── Init ──────────────────────────────────────────────────────────────────
 sbConnect();
 checkStatus();
@@ -2657,6 +3197,10 @@ fetchWheelState(true);
 fetchFirstState();
 fetchCheckinState();
 fetchButtonState();
+chConnectSSE();
+fetchCharityTiers();
+fetchCharityAssetImages();
+fetchCharityDiscordWebhook();
 updateGoalVisButtons();
 onGoalTypeChange();
 onRemoveTypeChange();

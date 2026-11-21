@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "dotenv": "^16.0.0",
+    "multer": "^2.0.0",
     "ws": "^8.0.0"
   },
   "engines": {

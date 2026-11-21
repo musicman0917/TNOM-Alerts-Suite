@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Tavern Donothon Overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   Tavern Donothon Overlay — cozy fantasy tavern theme (+ Disney/Halloween
+   alt themes, synced with the rest of the NOM Alerts overlay system).
+   Designed for a 1920x1080 OBS Browser Source (transparent background).
+   ========================================================================== */
+
+:root {
+  /* Tavern (default) theme */
+  --card-bg-1: #f1e3c6;
+  --card-bg-2: #e2cfa4;
+  --card-border: #d4a94e;
+
+  --frame-bg-1: #4a3222;
+  --frame-bg-2: #241811;
+  --frame-tint: rgba(44, 30, 22, 0.4);
+  --deep-border: #1a110b;
+  --track-border: #2c1e16;
+
+  --heading-color: #2c1e16;
+  --body-color: #3b2a1c;
+  --label-color: #3b2a1c;
+  --accent-strong: #8a5a1e;
+  --base-text: #f1e3c6;
+  --muted-text: #e2cfa4;
+
+  --gold: #d4a94e;
+  --gold-bright: #f2c766;
+
+  --shadow: rgba(0, 0, 0, 0.65);
+  --glow-scroll: rgba(120, 80, 30, 0.25);
+  --glow-inner: rgba(120, 80, 30, 0.3);
+  --glow-bar: rgba(242, 199, 102, 0.7);
+
+  --font-heading: 'MedievalSharp', cursive;
+  --font-title: 'Cinzel', serif;
+  --font-body: 'Lora', serif;
+}
+
+/* Disney theme — matches NOM Alerts' body[data-theme="disney"] palette */
+:root[data-theme='disney'] {
+  --card-bg-1: #1a0a2e;
+  --card-bg-2: #0d0620;
+  --card-border: #7b2fbe;
+
+  --frame-bg-1: #9b59b6;
+  --frame-bg-2: #0d0620;
+  --frame-tint: rgba(13, 6, 32, 0.5);
+  --deep-border: #0d0620;
+  --track-border: #0d0620;
+
+  --heading-color: #fff8dc;
+  --body-color: #fff8dc;
+  --label-color: #d4aaff;
+  --accent-strong: #ffd700;
+  --base-text: #fff8dc;
+  --muted-text: #d4aaff;
+
+  --gold: #ffd700;
+  --gold-bright: #ffd700;
+
+  --shadow: rgba(0, 0, 0, 0.65);
+  --glow-scroll: rgba(155, 89, 182, 0.35);
+  --glow-inner: rgba(155, 89, 182, 0.35);
+  --glow-bar: rgba(155, 89, 182, 0.6);
+}
+
+/* Halloween theme — matches NOM Alerts' body[data-theme="halloween"] palette */
+:root[data-theme='halloween'] {
+  --card-bg-1: #2a1508;
+  --card-bg-2: #180c04;
+  --card-border: #ff7518;
+
+  --frame-bg-1: #6a1b9a;
+  --frame-bg-2: #180c04;
+  --frame-tint: rgba(24, 12, 4, 0.5);
+  --deep-border: #180c04;
+  --track-border: #180c04;
+
+  --heading-color: #fff0dc;
+  --body-color: #fff0dc;
+  --label-color: #d9aaff;
+  --accent-strong: #ff7518;
+  --base-text: #fff0dc;
+  --muted-text: #d9aaff;
+
+  --gold: #ff7518;
+  --gold-bright: #ff9a4d;
+
+  --shadow: rgba(0, 0, 0, 0.65);
+  --glow-scroll: rgba(106, 27, 154, 0.35);
+  --glow-inner: rgba(106, 27, 154, 0.35);
+  --glow-bar: rgba(255, 117, 24, 0.6);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 1920px;
+  height: 1080px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--font-body);
+  color: var(--base-text);
+}
+
+/* --------------------------------------------------------------------------
+   Asset placeholders — top right corner
+   -------------------------------------------------------------------------- */
+.asset-corner {
+  position: fixed;
+  top: 32px;
+  right: 32px;
+  z-index: 4;
+  display: flex;
+  gap: 16px;
+}
+
+.asset-box {
+  width: 130px;
+  height: 130px;
+  border: 3px dashed var(--card-border);
+  border-radius: 8px;
+  background: var(--frame-tint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px;
+  transition: border-color 0.4s ease, background-color 0.4s ease;
+}
+
+.asset-box span {
+  font-family: var(--font-title);
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  color: var(--muted-text);
+  text-shadow: 0 2px 4px var(--shadow);
+  transition: color 0.4s ease;
+}
+
+.asset-image {
+  display: none;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.asset-box.has-image {
+  border-style: solid;
+  background: transparent;
+}
+
+.asset-box.has-image .asset-image {
+  display: block;
+}
+
+.asset-box.has-image span {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   Alert box — "A New Hero Approaches!" popup, top-center
+   -------------------------------------------------------------------------- */
+.alert-box {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translate(-50%, -140%) scale(0.92);
+  z-index: 10;
+  width: 760px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), visibility 0s linear 0.5s;
+}
+
+.alert-box.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0) scale(1);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), visibility 0s linear 0s;
+}
+
+.alert-scroll {
+  background:
+    radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.08), transparent 60%),
+    linear-gradient(160deg, var(--card-bg-1) 0%, var(--card-bg-2) 100%);
+  border: 4px solid var(--card-border);
+  border-radius: 10px;
+  padding: 28px 40px;
+  text-align: center;
+  box-shadow: 0 12px 32px var(--shadow), inset 0 0 30px var(--glow-scroll);
+  position: relative;
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.alert-scroll::before,
+.alert-scroll::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 22px;
+  background: linear-gradient(180deg, var(--frame-bg-1), var(--frame-bg-2));
+  border: 2px solid var(--deep-border);
+  border-radius: 6px;
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.alert-scroll::before { left: -18px; }
+.alert-scroll::after { right: -18px; }
+
+.alert-heading {
+  margin: 0 0 8px;
+  font-family: var(--font-heading);
+  font-size: 34px;
+  color: var(--heading-color);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: color 0.4s ease;
+}
+
+.alert-body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--body-color);
+  transition: color 0.4s ease;
+}
+
+.alert-body span {
+  color: var(--accent-strong);
+  font-weight: 700;
+  transition: color 0.4s ease;
+}
+
+.alert-box.tier2 {
+  width: 820px;
+}
+
+.alert-box.tier2 .alert-scroll {
+  border-width: 5px;
+  box-shadow: 0 14px 40px var(--shadow), inset 0 0 34px var(--glow-scroll), 0 0 40px var(--glow-bar);
+}
+
+.alert-box.tier2 .alert-heading {
+  font-size: 36px;
+}
+
+.alert-box.tier2 .alert-body {
+  font-size: 27px;
+}
+
+.alert-box.tier3 {
+  width: 900px;
+}
+
+.alert-box.tier3 .alert-scroll {
+  border-width: 6px;
+  border-color: var(--gold);
+  box-shadow: 0 16px 48px var(--shadow), inset 0 0 40px var(--glow-scroll), 0 0 60px var(--glow-bar);
+  animation: donationTierPulse 1.4s ease-in-out infinite;
+}
+
+.alert-box.tier3 .alert-heading {
+  font-size: 40px;
+}
+
+.alert-box.tier3 .alert-body {
+  font-size: 30px;
+}
+
+@keyframes donationTierPulse {
+  0%, 100% { box-shadow: 0 16px 48px var(--shadow), inset 0 0 40px var(--glow-scroll), 0 0 60px var(--glow-bar); }
+  50%      { box-shadow: 0 16px 48px var(--shadow), inset 0 0 40px var(--glow-scroll), 0 0 100px var(--glow-bar); }
+}
+
+/* --------------------------------------------------------------------------
+   Quest board — bottom UI bar, split into three separate panels
+   -------------------------------------------------------------------------- */
+.quest-board {
+  position: fixed;
+  left: 0;
+  right: 220px;
+  bottom: 24px;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 32px;
+}
+
+.quest-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 14px 28px;
+  background:
+    radial-gradient(ellipse at top, rgba(255, 255, 255, 0.06), transparent 60%),
+    linear-gradient(180deg, var(--card-bg-1) 0%, var(--card-bg-2) 100%);
+  border: 3px solid var(--card-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px var(--shadow), inset 0 0 22px var(--glow-inner);
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, padding 0.5s ease;
+}
+
+.quest-label {
+  font-family: var(--font-title);
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--label-color);
+  margin-bottom: 6px;
+  transition: color 0.4s ease;
+}
+
+.timer-section {
+  flex: 0 0 auto;
+  min-width: 220px;
+}
+
+.timer-section.hidden {
+  display: none;
+}
+
+.timer {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 52px;
+  color: var(--heading-color);
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: color 0.4s ease, opacity 0.3s ease, font-size 0.5s ease;
+}
+
+.timer.paused {
+  opacity: 0.6;
+  animation: timerPausedPulse 1.6s ease-in-out infinite;
+}
+
+.timer.paused::after {
+  content: '⏸ PAUSED';
+  display: block;
+  font-family: var(--font-title);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent-strong);
+  margin-top: 2px;
+}
+
+@keyframes timerPausedPulse {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 0.85; }
+}
+
+.goal-section {
+  position: fixed;
+  right: 24px;
+  top: 180px;
+  width: 136px;
+  height: 780px;
+  max-width: none;
+  flex: none;
+  display: block;
+  padding: 12px 8px;
+}
+
+#goal-text {
+  font-size: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goal-section #goal-text {
+  position: absolute;
+  top: 390px;
+  left: 17px;
+  width: 700px;
+  height: 26px;
+  margin-top: -13px;
+  margin-left: -350px;
+  transform: rotate(-90deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: unset;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.goal-bar-wrap {
+  position: absolute;
+  top: 12px;
+  right: 8px;
+  width: 90px;
+  height: 756px;
+}
+
+.goal-bar-track {
+  width: 100%;
+  height: 26px;
+  background: var(--frame-tint);
+  border: 2px solid var(--track-border);
+  border-radius: 13px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+  transition: border-color 0.4s ease, background-color 0.4s ease, height 0.5s ease;
+}
+
+.goal-section .goal-bar-track {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 756px;
+  height: 60px;
+  margin-top: -30px;
+  margin-left: -378px;
+  transform: rotate(-90deg);
+  border-radius: 10px;
+}
+
+.goal-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--gold), var(--gold), var(--gold-bright));
+  box-shadow: 0 0 12px var(--glow-bar);
+  transition: width 0.8s ease-out, background 0.4s ease, box-shadow 0.4s ease;
+}
+
+.goal-bar-markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.goal-section .goal-bar-markers {
+  display: none;
+}
+
+.goal-bar-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+}
+
+.goal-bar-marker-tick {
+  display: block;
+  width: 3px;
+  height: 100%;
+  background: var(--track-border);
+  opacity: 0.6;
+  transition: background-color 0.4s ease, opacity 0.3s ease, box-shadow 0.3s ease;
+}
+
+.goal-bar-marker.reached .goal-bar-marker-tick {
+  background: var(--gold);
+  opacity: 1;
+  box-shadow: 0 0 8px var(--glow-bar);
+}
+
+.hero-section {
+  flex: 0 0 auto;
+  min-width: 320px;
+  max-width: 420px;
+}
+
+.latest-hero {
+  font-family: var(--font-body);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--body-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.4s ease;
+}
+
+.quest-board.minimized .quest-panel {
+  padding: 8px 20px;
+}
+
+.quest-board.minimized .hero-section,
+.quest-board.minimized .goal-bar-markers {
+  display: none;
+}
+
+.quest-board.minimized .timer-section {
+  min-width: 0;
+}
+
+.quest-board.minimized .quest-label {
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.quest-board.minimized .timer {
+  font-size: 26px;
+}
+
+.quest-board.minimized .timer.paused::after {
+  display: none;
+}
+
+.quest-board.minimized #goal-text {
+  font-size: 14px;
+}
+
+.quest-board.minimized .goal-bar-track {
+  height: 14px;
+  border-radius: 7px;
+}
+
+.quest-board.minimized .goal-section .goal-bar-track {
+  height: 60px;
+  border-radius: 10px;
+}
+
+/* --------------------------------------------------------------------------
+   Next milestone callout
+   -------------------------------------------------------------------------- */
+.next-milestone {
+  position: fixed;
+  bottom: 172px;
+  left: 50%;
+  transform: translate(-50%, 12px);
+  z-index: 6;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 24px;
+  background:
+    radial-gradient(ellipse at top, rgba(255, 255, 255, 0.08), transparent 60%),
+    linear-gradient(160deg, var(--card-bg-1) 0%, var(--card-bg-2) 100%);
+  border: 3px solid var(--card-border);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px var(--shadow), inset 0 0 16px var(--glow-inner);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.4s ease, border-color 0.4s ease, visibility 0s linear 0.5s;
+}
+
+.next-milestone.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.4s ease, border-color 0.4s ease, visibility 0s linear 0s;
+}
+
+.next-milestone-label {
+  font-family: var(--font-title);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--label-color);
+  transition: color 0.4s ease;
+}
+
+.next-milestone-amount {
+  font-family: var(--font-title);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold);
+  transition: color 0.4s ease;
+}
+
+.next-milestone-text {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-style: italic;
+  color: var(--body-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+  transition: color 0.4s ease;
+}
+
+/* --------------------------------------------------------------------------
+   Milestone alert — big full-screen popup when a milestone is crossed
+   -------------------------------------------------------------------------- */
+.milestone-alert {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.4s ease, visibility 0s linear 0.4s;
+}
+
+.milestone-alert.show {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.4s ease, visibility 0s linear 0s;
+}
+
+.milestone-alert-inner {
+  width: 900px;
+  padding: 48px 60px;
+  text-align: center;
+  background:
+    radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.1), transparent 60%),
+    linear-gradient(160deg, var(--card-bg-1) 0%, var(--card-bg-2) 100%);
+  border: 6px solid var(--gold);
+  border-radius: 16px;
+  box-shadow: 0 0 80px var(--glow-bar), 0 24px 64px var(--shadow), inset 0 0 40px var(--glow-scroll);
+  transform: scale(0.85);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.milestone-alert.show .milestone-alert-inner {
+  transform: scale(1);
+  animation: milestonePulse 1.6s ease-in-out infinite;
+}
+
+@keyframes milestonePulse {
+  0%, 100% { box-shadow: 0 0 80px var(--glow-bar), 0 24px 64px var(--shadow), inset 0 0 40px var(--glow-scroll); }
+  50%      { box-shadow: 0 0 140px var(--glow-bar), 0 24px 64px var(--shadow), inset 0 0 40px var(--glow-scroll); }
+}
+
+.milestone-alert-heading {
+  margin: 0 0 12px;
+  font-family: var(--font-heading);
+  font-size: 40px;
+  color: var(--heading-color);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: color 0.4s ease;
+}
+
+.milestone-alert-amount {
+  margin: 0 0 12px;
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 84px;
+  color: var(--gold);
+  text-shadow: 0 0 30px var(--glow-bar);
+  transition: color 0.4s ease;
+}
+
+.milestone-alert-label {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 28px;
+  font-style: italic;
+  color: var(--body-color);
+  transition: color 0.4s ease;
+}
+
+/* Extra Life logo parked beside the vertical goal bar instead of the
+   top-right asset row; QR code / Dayton Children's logo stay up there. */
+#extra-life-logo-box {
+  position: fixed;
+  left: 1726px;
+  top: 190px;
+  width: 50px;
+  height: 50px;
+  padding: 4px;
+}
+
+#extra-life-logo-box span {
+  display: none;
+}
+</style>
+</head>
+<body>
+
+  <div class="asset-corner">
+    <div class="asset-box" id="qr-code-box">
+      <img class="asset-image" id="qr-code-image" alt="QR Code" />
+      <span>QR Code</span>
+    </div>
+    <div class="asset-box" id="extra-life-logo-box">
+      <img class="asset-image" id="extra-life-logo-image" alt="Extra Life Logo" />
+      <span>Extra Life Logo</span>
+    </div>
+    <div class="asset-box" id="dayton-childrens-logo-box">
+      <img class="asset-image" id="dayton-childrens-logo-image" alt="Dayton Children's Logo" />
+      <span>Dayton Children's Logo</span>
+    </div>
+  </div>
+
+  <div class="alert-box" id="alert-box">
+    <div class="alert-scroll">
+      <p class="alert-heading">A New Hero Approaches!</p>
+      <p class="alert-body">
+        <span id="alert-name">Someone</span> donated
+        <span id="alert-amount">$0</span>!
+      </p>
+    </div>
+  </div>
+
+  <div class="next-milestone" id="next-milestone">
+    <span class="next-milestone-label">Next Milestone</span>
+    <span class="next-milestone-amount" id="next-milestone-amount">$0</span>
+    <span class="next-milestone-text" id="next-milestone-text"></span>
+  </div>
+
+  <div class="milestone-alert" id="milestone-alert">
+    <div class="milestone-alert-inner">
+      <p class="milestone-alert-heading">Milestone Reached!</p>
+      <p class="milestone-alert-amount" id="milestone-alert-amount">$0</p>
+      <p class="milestone-alert-label" id="milestone-alert-label"></p>
+    </div>
+  </div>
+
+  <div class="quest-board" id="quest-board">
+
+    <div class="quest-panel timer-section">
+      <span class="quest-label">Donothon Timer</span>
+      <span class="timer" id="timer">04:00:00</span>
+    </div>
+
+    <div class="quest-panel goal-section">
+      <span class="quest-label" id="goal-text">$0 / $1000 &mdash; For Dayton Children's Hospital</span>
+      <div class="goal-bar-wrap">
+        <div class="goal-bar-track">
+          <div class="goal-bar-fill" id="goal-bar-fill"></div>
+        </div>
+        <div class="goal-bar-markers" id="goal-bar-markers"></div>
+      </div>
+    </div>
+
+    <div class="quest-panel hero-section">
+      <span class="quest-label">Latest Hero</span>
+      <span class="latest-hero" id="latest-hero">Awaiting a brave soul&hellip;</span>
+    </div>
+
+  </div>
+
+<script>
+const questBoardEl = document.getElementById('quest-board');
+const timerEl = document.getElementById('timer');
+const timerSectionEl = document.querySelector('.timer-section');
+const goalTextEl = document.getElementById('goal-text');
+const goalBarFillEl = document.getElementById('goal-bar-fill');
+const latestHeroEl = document.getElementById('latest-hero');
+
+const alertBoxEl = document.getElementById('alert-box');
+const alertNameEl = document.getElementById('alert-name');
+const alertAmountEl = document.getElementById('alert-amount');
+
+const goalBarMarkersEl = document.getElementById('goal-bar-markers');
+
+const milestoneAlertEl = document.getElementById('milestone-alert');
+const milestoneAlertAmountEl = document.getElementById('milestone-alert-amount');
+const milestoneAlertLabelEl = document.getElementById('milestone-alert-label');
+
+const nextMilestoneEl = document.getElementById('next-milestone');
+const nextMilestoneAmountEl = document.getElementById('next-milestone-amount');
+const nextMilestoneTextEl = document.getElementById('next-milestone-text');
+
+let goal = 1000;
+let milestonesData = [];
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === 'disney' || theme === 'halloween') {
+    root.setAttribute('data-theme', theme);
+  } else {
+    root.removeAttribute('data-theme'); // 'tavern' (default) or any other unrecognized theme
+  }
+}
+
+function formatTimer(totalSeconds) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  const seconds = s % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+function formatMoney(amount) {
+  return `$${Number(amount).toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+function updateTimer(seconds, paused) {
+  timerEl.textContent = formatTimer(seconds);
+  timerEl.classList.toggle('paused', !!paused);
+  questBoardEl.classList.toggle('minimized', !!paused);
+}
+
+function updateTimerVisibility(visible) {
+  timerSectionEl.classList.toggle('hidden', !visible);
+}
+
+function updateGoal(totalRaised) {
+  goalTextEl.textContent = `${formatMoney(totalRaised)} / ${formatMoney(goal)} — For Dayton Children's Hospital`;
+  const pct = goal > 0 ? Math.min(100, (totalRaised / goal) * 100) : 0;
+  goalBarFillEl.style.width = `${pct}%`;
+}
+
+function updateLatestHero(name, amount) {
+  if (!name) return;
+  latestHeroEl.textContent = `${name} — ${formatMoney(amount)}`;
+}
+
+function renderMilestones() {
+  goalBarMarkersEl.innerHTML = '';
+  for (const m of milestonesData) {
+    const pct = goal > 0 ? Math.min(100, (m.amount / goal) * 100) : 0;
+    const marker = document.createElement('div');
+    marker.className = `goal-bar-marker${m.reached ? ' reached' : ''}`;
+    marker.style.left = `${pct}%`;
+    const tick = document.createElement('span');
+    tick.className = 'goal-bar-marker-tick';
+    marker.appendChild(tick);
+    goalBarMarkersEl.appendChild(marker);
+  }
+}
+
+const NEXT_MILESTONE_INITIAL_DELAY_MS = 5000;
+const NEXT_MILESTONE_INTERVAL_MS = 90000;
+const NEXT_MILESTONE_VISIBLE_MS = 8000;
+
+function getNextMilestone() {
+  return milestonesData.find((m) => !m.reached) || null;
+}
+
+function showNextMilestoneCallout() {
+  const next = getNextMilestone();
+  if (!next) return;
+  nextMilestoneAmountEl.textContent = formatMoney(next.amount);
+  nextMilestoneTextEl.textContent = next.label;
+  nextMilestoneEl.classList.add('show');
+  setTimeout(() => { nextMilestoneEl.classList.remove('show'); }, NEXT_MILESTONE_VISIBLE_MS);
+}
+
+setTimeout(() => {
+  showNextMilestoneCallout();
+  setInterval(showNextMilestoneCallout, NEXT_MILESTONE_INTERVAL_MS);
+}, NEXT_MILESTONE_INITIAL_DELAY_MS);
+
+const milestoneAlertQueue = [];
+let milestoneAlertShowing = false;
+
+function queueMilestoneAlert(amount, label) {
+  milestoneAlertQueue.push({ amount, label });
+  processMilestoneAlertQueue();
+}
+
+function processMilestoneAlertQueue() {
+  if (milestoneAlertShowing || milestoneAlertQueue.length === 0) return;
+  const { amount, label } = milestoneAlertQueue.shift();
+  milestoneAlertShowing = true;
+  milestoneAlertAmountEl.textContent = formatMoney(amount);
+  milestoneAlertLabelEl.textContent = label;
+  milestoneAlertEl.classList.add('show');
+  setTimeout(() => {
+    milestoneAlertEl.classList.remove('show');
+    setTimeout(() => {
+      milestoneAlertShowing = false;
+      processMilestoneAlertQueue();
+    }, 500);
+  }, 8000);
+}
+
+const DEFAULT_DONATION_TIER = { id: 'tier1', minAmount: 0, durationMs: 5000, sounds: [] };
+let donationTiers = [DEFAULT_DONATION_TIER];
+
+function loadDonationTiersData(data) {
+  if (Array.isArray(data) && data.length) {
+    donationTiers = [...data].sort((a, b) => a.minAmount - b.minAmount);
+  }
+}
+
+fetch('/charity/donation-tiers')
+  .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+  .then(loadDonationTiersData)
+  .catch((err) => {
+    console.warn(`[donation-tiers] could not load donation tiers (${err.message}); using default tier`);
+  });
+
+function getTierForAmount(amount) {
+  let match = donationTiers[0];
+  for (const tier of donationTiers) {
+    if (amount >= tier.minAmount) match = tier;
+  }
+  return match;
+}
+
+function pickRandomSound(tier) {
+  const sounds = tier.sounds;
+  if (!Array.isArray(sounds) || sounds.length === 0) return null;
+  const chosen = sounds[Math.floor(Math.random() * sounds.length)];
+  return typeof chosen === 'string' ? chosen : chosen.path;
+}
+
+function applyAssetImages(assetImages) {
+  for (const asset of assetImages) {
+    const boxEl = document.getElementById(`${asset.id}-box`);
+    const imgEl = document.getElementById(`${asset.id}-image`);
+    if (!boxEl || !imgEl) continue;
+    if (asset.file) {
+      imgEl.src = asset.file;
+      boxEl.classList.add('has-image');
+    } else {
+      imgEl.removeAttribute('src');
+      boxEl.classList.remove('has-image');
+    }
+  }
+}
+
+fetch('/charity/asset-images')
+  .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+  .then((data) => { if (Array.isArray(data)) applyAssetImages(data); })
+  .catch((err) => {
+    console.warn(`[asset-images] could not load asset images (${err.message})`);
+  });
+
+const DONATION_SOUND_VOLUME = 0.8;
+const donationSoundCache = {};
+
+function playDonationSound(tier) {
+  const soundPath = pickRandomSound(tier);
+  if (!soundPath) return;
+  let audio = donationSoundCache[soundPath];
+  if (!audio) {
+    audio = new Audio(soundPath);
+    audio.volume = DONATION_SOUND_VOLUME;
+    donationSoundCache[soundPath] = audio;
+  }
+  audio.currentTime = 0;
+  audio.play().catch(() => {});
+}
+
+const alertQueue = [];
+let alertShowing = false;
+
+function queueAlert(name, amount) {
+  alertQueue.push({ name, amount });
+  processAlertQueue();
+}
+
+function processAlertQueue() {
+  if (alertShowing || alertQueue.length === 0) return;
+  const { name, amount } = alertQueue.shift();
+  alertShowing = true;
+  const tier = getTierForAmount(amount);
+  alertNameEl.textContent = name;
+  alertAmountEl.textContent = formatMoney(amount);
+  alertBoxEl.classList.remove('tier1', 'tier2', 'tier3');
+  alertBoxEl.classList.add(tier.id, 'show');
+  playDonationSound(tier);
+  setTimeout(() => {
+    alertBoxEl.classList.remove('show');
+    setTimeout(() => {
+      alertShowing = false;
+      processAlertQueue();
+    }, 500);
+  }, tier.durationMs || 5000);
+}
+
+// --------------------------------------------------------------------------
+// Live state — SSE from this same server (/charity/events), replacing the
+// original standalone app's Socket.io connection now that it's one source.
+// --------------------------------------------------------------------------
+let charitySse;
+function connectCharitySse() {
+  if (charitySse) charitySse.close();
+  charitySse = new EventSource('/charity/events');
+  charitySse.onmessage = (ev) => {
+    let data;
+    try { data = JSON.parse(ev.data); } catch (e) { return; }
+
+    switch (data.type) {
+      case 'state':
+        if (typeof data.goal === 'number') goal = data.goal;
+        updateTimer(data.currentTimer, data.timerPaused);
+        updateGoal(data.totalRaised);
+        if (data.latestDonorName) updateLatestHero(data.latestDonorName, data.latestDonorAmount);
+        applyTheme(data.theme);
+        milestonesData = Array.isArray(data.milestones) ? data.milestones : [];
+        renderMilestones();
+        updateTimerVisibility(data.timerVisible !== false);
+        break;
+      case 'milestonesUpdate':
+        milestonesData = Array.isArray(data.milestones) ? data.milestones : [];
+        renderMilestones();
+        break;
+      case 'timerVisibilityUpdate':
+        updateTimerVisibility(data.timerVisible !== false);
+        break;
+      case 'milestoneReached':
+        queueMilestoneAlert(data.amount, data.label);
+        break;
+      case 'themeUpdate':
+        applyTheme(data.theme);
+        break;
+      case 'assetImagesUpdate':
+        applyAssetImages(data.assetImages);
+        break;
+      case 'donationTiersUpdate':
+        loadDonationTiersData(data.donationTiers);
+        break;
+      case 'timerTick':
+        updateTimer(data.currentTimer, data.timerPaused);
+        break;
+      case 'totalUpdate':
+        if (typeof data.goal === 'number') goal = data.goal;
+        updateGoal(data.totalRaised);
+        break;
+      case 'newDonation':
+        if (!data.test) updateLatestHero(data.name, data.amount);
+        queueAlert(data.name, data.amount);
+        break;
+    }
+  };
+  charitySse.onerror = () => { charitySse.close(); setTimeout(connectCharitySse, 3000); };
+}
+
+connectCharitySse();
+</script>
+</body>
+</html>
