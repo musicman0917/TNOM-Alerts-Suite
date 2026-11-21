@@ -1137,6 +1137,15 @@
   }
   .circle-fill.pulse { animation: goalPulse 1s ease-in-out 3; }
 
+  #charity-widget {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    pointer-events: none;
+  }
+
 </style>
 <script src="config.js"></script>
 </head>
@@ -1186,6 +1195,23 @@
         <div class="health-fill water" id="water-fill"></div>
       </div>
     </div>
+  </div>
+
+  <!-- Charity Donothon -->
+  <div id="charity-widget">
+    <div class="circle-wrap">
+      <svg class="circle-svg" viewBox="0 0 140 140">
+        <circle class="circle-track" cx="70" cy="70" r="60"/>
+        <circle class="circle-fill" id="charity-circle-fill" cx="70" cy="70" r="60"/>
+      </svg>
+      <div class="circle-inner">
+        <div class="circle-pct"   id="charity-pct">0%</div>
+        <div class="circle-label">raised</div>
+      </div>
+    </div>
+    <div class="goal-title">💝 Charity Donothon</div>
+    <div class="goal-amounts" id="charity-amounts">$0 / $0</div>
+    <div class="goal-amounts" id="charity-timer-text">--:--:--</div>
   </div>
 
 </div><!-- end #top-left-widgets -->
@@ -1462,7 +1488,9 @@ function updateTopLeftWidgetsVisibility() {
   const goalWidget = document.getElementById('goal-widget');
   const goalVisible = goalWidget && goalWidget.style.display !== 'none';
   const anyHealthVisible = healthEnabled.steps || healthEnabled.water;
-  if (!goalVisible && !anyHealthVisible) {
+  const charityWidget = document.getElementById('charity-widget');
+  const charityVisible = charityWidget && charityWidget.style.display !== 'none';
+  if (!goalVisible && !anyHealthVisible && !charityVisible) {
     container.style.display = 'none';
   } else {
     container.style.display = '';
@@ -2557,6 +2585,22 @@ const CONFIGS = {
     color:  '#F0C060',
     dur:    6000,
   },
+  charity_donation: {
+    icon:   '💝',
+    label:  'Charity Donation',
+    action: (u,a)    => `${u} donated $${parseFloat(a||5).toFixed(2)}!`,
+    sub:    ()       => "For Dayton Children's Hospital 💛",
+    color:  '#F0C060',
+    dur:    6000,
+  },
+  charity_milestone: {
+    icon:   '🏆',
+    label:  'Charity Milestone',
+    action: (u)      => `${u} raised!`,
+    sub:    ()       => 'The donothon reaches new heights!',
+    color:  '#FFD700',
+    dur:    7000,
+  },
   shoutout: {
     icon:    null,
     iconUrl: () => null, // replaced at render time with profile pic
@@ -2787,12 +2831,37 @@ const SOUNDS = {
   tip:     null,
 };
 
+// Charity donation-tier sounds — fetched once, refreshed live if a mod
+// uploads new ones via the admin Charity tab.
+let charityDonationTiersCache = [];
+(function loadCharityDonationTiersCache() {
+  const base = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
+    ? CONFIG.tokenBrokerUrl.replace('/token', '')
+    : 'http://192.168.6.228:3010';
+  fetch(`${base}/charity/donation-tiers`)
+    .then(r => r.json())
+    .then(d => { charityDonationTiersCache = Array.isArray(d) ? d : []; })
+    .catch(() => {});
+})();
+
+function charityPickTierSound(amount) {
+  const tiers = charityDonationTiersCache
+    .filter(t => typeof t.minAmount === 'number')
+    .sort((a, b) => a.minAmount - b.minAmount);
+  let match = tiers[0] || null;
+  for (const t of tiers) { if (Number(amount) >= t.minAmount) match = t; }
+  const sounds = match && Array.isArray(match.sounds) ? match.sounds : [];
+  if (!sounds.length) return null;
+  return sounds[Math.floor(Math.random() * sounds.length)].path;
+}
+
 // Special sound overrides based on amount
 const SOUND_OVERRIDES = {
   bits: (amount) => {
     if (Number(amount) === 69) return 'Assets/Sounds/69-bits.mp3';
     return null;
   },
+  charity_donation: (amount) => charityPickTierSound(amount),
 };
 
 const SOUND_VOLUME = (typeof CONFIG !== 'undefined' && CONFIG.soundVolume != null) ? CONFIG.soundVolume : 0.8;
@@ -3332,6 +3401,76 @@ function connectAlertBus() {
 }
 
 connectAlertBus();
+
+// ─── Charity Donothon bus (separate SSE — own goal ring + alerts) ──────────
+function charityFormatMoney(amount) {
+  return `$${Math.round(Number(amount) || 0).toLocaleString('en-US')}`;
+}
+
+function updateCharityGoalUI(totalRaised, goal) {
+  const pct = goal > 0 ? Math.min(totalRaised / goal, 1) : 0;
+  document.getElementById('charity-pct').textContent = `${Math.round(pct * 100)}%`;
+  document.getElementById('charity-amounts').textContent = `${charityFormatMoney(totalRaised)} / ${charityFormatMoney(goal)}`;
+  const CIRC = 377; // circumference of r=60 circle, matches #circle-fill above
+  document.getElementById('charity-circle-fill').style.strokeDashoffset = CIRC - pct * CIRC;
+}
+
+function updateCharityTimer(seconds) {
+  const s = Math.max(0, Math.floor(Number(seconds) || 0));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  document.getElementById('charity-timer-text').textContent = `${pad(h)}:${pad(m)}:${pad(sec)}`;
+}
+
+function setCharityWidgetVisible(visible) {
+  const widget = document.getElementById('charity-widget');
+  if (widget) widget.style.display = visible ? '' : 'none';
+  updateTopLeftWidgetsVisibility();
+}
+
+function connectCharityBus() {
+  const brokerBase = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
+    ? CONFIG.tokenBrokerUrl.replace('/token', '')
+    : 'http://192.168.6.228:3010';
+
+  const es = new EventSource(`${brokerBase}/charity/events`);
+
+  es.onmessage = (e) => {
+    let data;
+    try { data = JSON.parse(e.data); } catch { return; }
+    switch (data.type) {
+      case 'state':
+        updateCharityGoalUI(data.totalRaised, data.goal);
+        updateCharityTimer(data.currentTimer);
+        setCharityWidgetVisible(data.timerVisible !== false);
+        break;
+      case 'totalUpdate':
+        updateCharityGoalUI(data.totalRaised, data.goal);
+        break;
+      case 'newDonation':
+        showAlert('charity_donation', data.name, data.amount);
+        break;
+      case 'milestoneReached':
+        showAlert('charity_milestone', charityFormatMoney(data.amount), null, data.label);
+        break;
+      case 'timerTick':
+        updateCharityTimer(data.currentTimer);
+        break;
+      case 'timerVisibilityUpdate':
+        setCharityWidgetVisible(!!data.timerVisible);
+        break;
+      case 'donationTiersUpdate':
+        charityDonationTiersCache = data.donationTiers || [];
+        break;
+    }
+  };
+
+  es.onerror = () => {
+    console.log(`[charity bus] SSE error — readyState: ${es.readyState} (0=connecting, 1=open, 2=closed)`);
+  };
+}
+
+connectCharityBus();
 
 // ─── Streamer.bot WebSocket ─────────────────────────────────────────────────
 const SB_URL  = (typeof CONFIG !== 'undefined' && CONFIG.streamerbotUrl) ? CONFIG.streamerbotUrl : 'ws://127.0.0.1:8080';
