@@ -1141,10 +1141,20 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-shrink: 0;
     pointer-events: none;
   }
+  /* Scoped smaller sizing — shares classes with #goal-widget's circle,
+     so overrides are keyed off #charity-widget specifically. */
+  #charity-widget .circle-wrap  { width: 100px; height: 100px; }
+  #charity-widget .circle-svg   { width: 100px; height: 100px; }
+  #charity-widget .circle-fill,
+  #charity-widget .circle-track { stroke-width: 7; }
+  #charity-widget .circle-pct   { font-size: 20px; }
+  #charity-widget .circle-label { font-size: 9px; }
+  #charity-widget .goal-title   { font-size: 8px; }
+  #charity-widget .goal-amounts { font-size: 10px; }
 
 </style>
 <script src="config.js"></script>
@@ -1200,9 +1210,9 @@
   <!-- Charity Donothon -->
   <div id="charity-widget">
     <div class="circle-wrap">
-      <svg class="circle-svg" viewBox="0 0 140 140">
-        <circle class="circle-track" cx="70" cy="70" r="60"/>
-        <circle class="circle-fill" id="charity-circle-fill" cx="70" cy="70" r="60"/>
+      <svg class="circle-svg" viewBox="0 0 100 100">
+        <circle class="circle-track" cx="50" cy="50" r="42"/>
+        <circle class="circle-fill" id="charity-circle-fill" cx="50" cy="50" r="42"/>
       </svg>
       <div class="circle-inner">
         <div class="circle-pct"   id="charity-pct">0%</div>
@@ -3411,7 +3421,7 @@ function updateCharityGoalUI(totalRaised, goal) {
   const pct = goal > 0 ? Math.min(totalRaised / goal, 1) : 0;
   document.getElementById('charity-pct').textContent = `${Math.round(pct * 100)}%`;
   document.getElementById('charity-amounts').textContent = `${charityFormatMoney(totalRaised)} / ${charityFormatMoney(goal)}`;
-  const CIRC = 377; // circumference of r=60 circle, matches #circle-fill above
+  const CIRC = 264; // circumference of the charity circle's r=42
   document.getElementById('charity-circle-fill').style.strokeDashoffset = CIRC - pct * CIRC;
 }
 

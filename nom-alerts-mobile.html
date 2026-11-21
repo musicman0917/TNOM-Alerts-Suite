@@ -132,6 +132,14 @@
     width: 130px;
   }
 
+  /* Scoped smaller sizing — shares classes with the goal/steps/water bars,
+     so overrides are keyed off #sw-charity-row specifically. */
+  #sw-charity-row { width: 90px; gap: 6px; }
+  #sw-charity-row .sw-icon { font-size: 32px; }
+  #sw-charity-row .sw-track-v { height: 150px; }
+  #sw-charity-row .sw-label { font-size: 12px; }
+  #sw-charity-row .sw-value { font-size: 15px; }
+
   .sw-icon {
     font-size: 48px;
     line-height: 1;
@@ -544,7 +552,7 @@
     <div class="sw-track-v"><div class="sw-fill-v charity" id="sw-charity-fill"></div></div>
     <div class="sw-label" id="sw-charity-title">$0</div>
     <div class="sw-value" id="sw-charity-value">/ $0</div>
-    <div class="sw-value" id="sw-charity-timer" style="font-size:16px;">--:--:--</div>
+    <div class="sw-value" id="sw-charity-timer" style="font-size:11px;">--:--:--</div>
   </div>
 </div>
 
