@@ -1629,6 +1629,30 @@ function setCharityRowVisible(visible) {
   if (row) row.style.display = visible ? '' : 'none';
 }
 
+// Kept minimal: instead of sitting on screen permanently, the bar pops up
+// briefly on a cadence. `charityEnabledByAdmin` is the master on/off switch
+// from the admin Charity tab; `charityPopupPhase` is this cycle's show/hide
+// state. Both must be true for the bar to actually render.
+let charityEnabledByAdmin = true;
+let charityPopupPhase     = false;
+const CHARITY_POPUP_SHOW_MS = 15000;
+const CHARITY_POPUP_HIDE_MS = 285000; // ~5 minutes between appearances
+
+function applyCharityVisibility() {
+  setCharityRowVisible(charityEnabledByAdmin && charityPopupPhase);
+}
+
+function charityPopupCycle() {
+  charityPopupPhase = true;
+  applyCharityVisibility();
+  setTimeout(() => {
+    charityPopupPhase = false;
+    applyCharityVisibility();
+    setTimeout(charityPopupCycle, CHARITY_POPUP_HIDE_MS);
+  }, CHARITY_POPUP_SHOW_MS);
+}
+charityPopupCycle();
+
 function connectCharityBus() {
   const brokerBase = (typeof CONFIG !== 'undefined' && CONFIG.tokenBrokerUrl)
     ? CONFIG.tokenBrokerUrl.replace('/token', '')
@@ -1643,7 +1667,8 @@ function connectCharityBus() {
       case 'state':
         updateCharityBarUI(data.totalRaised, data.goal);
         updateCharityTimer(data.currentTimer);
-        setCharityRowVisible(data.timerVisible !== false);
+        charityEnabledByAdmin = data.timerVisible !== false;
+        applyCharityVisibility();
         break;
       case 'totalUpdate':
         updateCharityBarUI(data.totalRaised, data.goal);
@@ -1658,7 +1683,8 @@ function connectCharityBus() {
         updateCharityTimer(data.currentTimer);
         break;
       case 'timerVisibilityUpdate':
-        setCharityRowVisible(!!data.timerVisible);
+        charityEnabledByAdmin = !!data.timerVisible;
+        applyCharityVisibility();
         break;
     }
   };
