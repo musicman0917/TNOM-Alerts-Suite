@@ -45,6 +45,25 @@
   body[data-theme="halloween"] .accent {
     background: linear-gradient(90deg, #6A1B9A, #FF7518) !important;
   }
+
+  /* ─── Christmas Theme ──────────────────────────────── */
+  body[data-theme="christmas"] {
+    --amber:      #F0C040;
+    --warm:       #FFE9A8;
+    --cream:      #FFF8F0;
+    --muted:      #E8A0A0;
+    --dark-muted: #B06060;
+    --border:     #B91C1C;
+    --glow-rgba:  rgba(185,28,28,.5);
+  }
+  body[data-theme="christmas"] .card {
+    background: linear-gradient(155deg, #2a0a0a, #140505) !important;
+    border-color: #B91C1C !important;
+    box-shadow: 0 0 30px rgba(185,28,28,.45), 0 8px 32px rgba(0,0,0,.8) !important;
+  }
+  body[data-theme="christmas"] .accent {
+    background: linear-gradient(90deg, #1B5E3A, #F0C040) !important;
+  }
   /* ─── Social Scroller ───────────────────────────────── */
   #social-scroller {
     position: fixed;
@@ -197,6 +216,15 @@
   body[data-theme="halloween"] .sw-fill-v.water { background: linear-gradient(to top, #2D0A40, #6A1B9A); }
   body[data-theme="halloween"] .sw-fill-v.charity { background: linear-gradient(to top, #6A1B9A, #FF7518); }
 
+  body[data-theme="christmas"] .sw-track-v {
+    border-color: rgba(185,28,28,.4);
+    background: rgba(185,28,28,.1);
+  }
+  body[data-theme="christmas"] .sw-fill-v.goal  { background: linear-gradient(to top, #1B5E3A, #F0C040); }
+  body[data-theme="christmas"] .sw-fill-v.steps { background: linear-gradient(to top, #0F5132, #2E8B57); }
+  body[data-theme="christmas"] .sw-fill-v.water { background: linear-gradient(to top, #1A5276, #85C1E9); }
+  body[data-theme="christmas"] .sw-fill-v.charity { background: linear-gradient(to top, #B91C1C, #F0C040); }
+
   /* ─── Channel Goal Bar ──────────────────────────────── */
   .channel-goal-bar {
     margin: 8px 20px 0;
@@ -236,6 +264,9 @@
   body[data-theme="halloween"] .channel-goal-fill {
     background: linear-gradient(to right, #6A1B9A, #FF7518);
   }
+  body[data-theme="christmas"] .channel-goal-fill {
+    background: linear-gradient(to right, #1B5E3A, #F0C040);
+  }
 
   body[data-theme="disney"] .card.enter {
     animation: disneyCardIn .6s cubic-bezier(.34,1.52,.64,1) forwards !important;
@@ -252,6 +283,15 @@
     0%   { opacity:0;   transform:translateX(-60px) scale(.9) rotate(1deg); }
     60%  { opacity:.85; }
     100% { opacity:1;   transform:translateX(0)     scale(1)  rotate(0deg);  }
+  }
+
+  body[data-theme="christmas"] .card.enter {
+    animation: christmasCardIn .6s cubic-bezier(.34,1.52,.64,1) forwards !important;
+  }
+  @keyframes christmasCardIn {
+    0%   { opacity:0;   transform:translateX(-60px) scale(.92) rotate(-1deg); }
+    60%  { opacity:.9; }
+    100% { opacity:1;   transform:translateX(0)     scale(1)   rotate(0deg);  }
   }
 
   :root {
@@ -647,6 +687,25 @@ const THEME_OVERRIDES = {
     merch:        { icon:'🛍️', action: u      => `${u} raided the haunted store!`,           sub: () => 'Thank you for the support! 🎃',                     color:'#FF7518' },
     membership:   { icon:'💀', action: u      => `${u} joined the haunted neighborhood!`,     sub: () => 'A new spirit joins the ranks! 👻',                  color:'#6A1B9A' },
   },
+  christmas: {
+    follow:       { icon:'🎄', action: u      => `${u} joined the neighborhood for the holidays!`, sub: () => 'Welcome to the celebration! 🎄',                color:'#F0C040' },
+    sub:          { icon:'🎁', action: (u,a)  => `${u} became a member of the neighborhood!`,   sub: (u,a) => christmasSubMsg(a),                            color:'#B91C1C' },
+    resub:        { icon:'⭐', action: (u,a)  => `${u} has celebrated with the neighborhood for ${a} months!`, sub: () => 'The holiday spirit keeps growing! 🎄', color:'#1B5E3A' },
+    giftsub:      { icon:'🎅', action: (u,a)  => `${u} shared some gifts with the neighborhood!`, sub: (u,a) => `${a} membership${Number(a)>1?'s':''} gifted!`, color:'#B91C1C' },
+    bits:         { icon:'❄️', action: (u,a)  => `${u} sent ${a} snowflakes to the neighborhood!`, color:'#F0C040' },
+    raid:         { icon:'🛷', action: (u,a)  => `${u} led ${a} carolers to the neighborhood!`, sub: () => 'The neighborhood grows! 🎄',                     color:'#1B5E3A' },
+    raid_out:     { icon:'🛷', action: (u)    => `Raiding ${u}!`,                               sub: () => 'Off to spread holiday cheer! 🎅',                color:'#1B5E3A' },
+    tip:          { icon:'🎀', action: (u,a)  => `${u} left a gift for the neighborhood!`,      sub: (u,a) => a ? `$${parseFloat(a).toFixed(2)} — thank you! 🎄` : '', color:'#F0C040' },
+    yt_subscriber:{ icon:'🎬', action: u      => `${u} joined the neighborhood on YouTube!`,    sub: () => 'The holiday spirit keeps growing! 🎄',           color:'#B91C1C' },
+    yt_superchat: { icon:'💬🎄',action:(u,a)  => `${u} sent a message to the neighborhood!`,            color:'#1B5E3A' },
+    yt_member:    { icon:'👑', action: u      => `${u} became a member!`,                       sub: () => 'A new member of the celebration! 🎄',            color:'#B91C1C' },
+    yt_milestone: { icon:'⭐', action:(u,a)   => `${u} — ${a||'milestone'} months in the neighborhood!`, color:'#F0C040' },
+    yt_giftmember:{ icon:'🎁', action:(u,a)  => `${u} gifted ${a||1} membership${Number(a)>1?'s':''}!`, sub: () => 'Spreading the holiday cheer! 🎄', color:'#1B5E3A' },
+    watch_streak: { icon:'⭐', action: (u,a)  => `${u} — ${a} streams in a row!`,       sub: (u,a) => christmasStreakMsg(Number(a)||0),                     color:'#F0C040' },
+    daily_checkin:{ icon:'🎤🎄',action: u     => `${u} checked in for the soundcheck!`,      sub: () => 'Welcome to the celebration! 🎄',                     color:'#B91C1C' },
+    merch:        { icon:'🛍️', action: u      => `${u} shopped the neighborhood store!`,      sub: () => 'Thank you for the support! 🎄',                     color:'#F0C040' },
+    membership:   { icon:'🎅', action: u      => `${u} joined the neighborhood!`,              sub: () => 'A new member of the celebration! 🎄',               color:'#B91C1C' },
+  },
 };
 
 function disneySubMsg(tier) {
@@ -679,6 +738,22 @@ function halloweenStreakMsg(n) {
   if (n >= 10)  return '🦇 The neighborhood keeps calling them back!';
   if (n >= 5)   return '🕸️ Feeling right at home in the haunt!';
   return '🎃 Welcome to the haunted neighborhood!';
+}
+
+function christmasSubMsg(tier) {
+  const t = Number(tier);
+  if (t >= 3) return 'A true pillar of the holiday neighborhood! 🎄👑';
+  if (t >= 2) return 'A cherished member of the celebration! 🎁';
+  return 'A member of the holiday neighborhood! 🎄';
+}
+
+function christmasStreakMsg(n) {
+  if (n >= 100) return '🎄 A true neighborhood holiday legend!';
+  if (n >= 50)  return '🎁 Truly part of the celebration!';
+  if (n >= 25)  return '⭐ Celebrating with the neighborhood, stream after stream!';
+  if (n >= 10)  return '❄️ The neighborhood keeps calling them back!';
+  if (n >= 5)   return '🎅 Feeling right at home for the holidays!';
+  return '🎄 Welcome to the holiday neighborhood!';
 }
 
 let _baseConfigs = null;

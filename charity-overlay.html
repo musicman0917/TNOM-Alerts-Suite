@@ -101,6 +101,34 @@
   --glow-bar: rgba(255, 117, 24, 0.6);
 }
 
+/* Christmas theme — matches NOM Alerts' body[data-theme="christmas"] palette */
+:root[data-theme='christmas'] {
+  --card-bg-1: #2a0a0a;
+  --card-bg-2: #140505;
+  --card-border: #b91c1c;
+
+  --frame-bg-1: #1b5e3a;
+  --frame-bg-2: #140505;
+  --frame-tint: rgba(20, 5, 5, 0.5);
+  --deep-border: #140505;
+  --track-border: #140505;
+
+  --heading-color: #fff8f0;
+  --body-color: #fff8f0;
+  --label-color: #e8a0a0;
+  --accent-strong: #f0c040;
+  --base-text: #fff8f0;
+  --muted-text: #e8a0a0;
+
+  --gold: #f0c040;
+  --gold-bright: #ffd700;
+
+  --shadow: rgba(0, 0, 0, 0.65);
+  --glow-scroll: rgba(27, 94, 58, 0.35);
+  --glow-inner: rgba(27, 94, 58, 0.35);
+  --glow-bar: rgba(240, 192, 64, 0.6);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -781,7 +809,7 @@ let milestonesData = [];
 
 function applyTheme(theme) {
   const root = document.documentElement;
-  if (theme === 'disney' || theme === 'halloween') {
+  if (theme === 'disney' || theme === 'halloween' || theme === 'christmas') {
     root.setAttribute('data-theme', theme);
   } else {
     root.removeAttribute('data-theme'); // 'tavern' (default) or any other unrecognized theme
