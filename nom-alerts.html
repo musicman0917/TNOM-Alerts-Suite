@@ -50,6 +50,10 @@
     background: linear-gradient(to right, #1A0050, #7B2FBE) !important;
   }
 
+  body[data-theme="disney"] .health-fill.charity {
+    background: linear-gradient(to right, #7B2FBE, #FFD700) !important;
+  }
+
   /* Disney sparkle animation on card */
   body[data-theme="disney"] .card.enter {
     animation: disneyCardIn .6s cubic-bezier(.34,1.52,.64,1) forwards !important;
@@ -101,6 +105,10 @@
 
   body[data-theme="halloween"] .health-fill.water {
     background: linear-gradient(to right, #2D0A40, #6A1B9A) !important;
+  }
+
+  body[data-theme="halloween"] .health-fill.charity {
+    background: linear-gradient(to right, #6A1B9A, #FF7518) !important;
   }
 
   /* Halloween flicker animation on card */
@@ -1145,16 +1153,8 @@
     flex-shrink: 0;
     pointer-events: none;
   }
-  /* Scoped smaller sizing — shares classes with #goal-widget's circle,
-     so overrides are keyed off #charity-widget specifically. */
-  #charity-widget .circle-wrap  { width: 100px; height: 100px; }
-  #charity-widget .circle-svg   { width: 100px; height: 100px; }
-  #charity-widget .circle-fill,
-  #charity-widget .circle-track { stroke-width: 7; }
-  #charity-widget .circle-pct   { font-size: 20px; }
-  #charity-widget .circle-label { font-size: 9px; }
-  #charity-widget .goal-title   { font-size: 8px; }
-  #charity-widget .goal-amounts { font-size: 10px; }
+  #charity-bar-row { width: 150px; }
+  .health-fill.charity { background: linear-gradient(to right, #8B1838, #E8749A); }
 
 </style>
 <script src="config.js"></script>
@@ -1209,18 +1209,15 @@
 
   <!-- Charity Donothon -->
   <div id="charity-widget">
-    <div class="circle-wrap">
-      <svg class="circle-svg" viewBox="0 0 100 100">
-        <circle class="circle-track" cx="50" cy="50" r="42"/>
-        <circle class="circle-fill" id="charity-circle-fill" cx="50" cy="50" r="42"/>
-      </svg>
-      <div class="circle-inner">
-        <div class="circle-pct"   id="charity-pct">0%</div>
-        <div class="circle-label">raised</div>
+    <div class="health-bar-row" id="charity-bar-row">
+      <div class="health-bar-header">
+        <span class="health-bar-label">💝 Donothon</span>
+        <span class="health-bar-value" id="charity-amounts">$0 / $0</span>
+      </div>
+      <div class="health-track">
+        <div class="health-fill charity" id="charity-fill"></div>
       </div>
     </div>
-    <div class="goal-title">💝 Charity Donothon</div>
-    <div class="goal-amounts" id="charity-amounts">$0 / $0</div>
     <div class="goal-amounts" id="charity-timer-text">--:--:--</div>
   </div>
 
@@ -3412,17 +3409,15 @@ function connectAlertBus() {
 
 connectAlertBus();
 
-// ─── Charity Donothon bus (separate SSE — own goal ring + alerts) ──────────
+// ─── Charity Donothon bus (separate SSE — own goal bar + alerts) ──────────
 function charityFormatMoney(amount) {
   return `$${Math.round(Number(amount) || 0).toLocaleString('en-US')}`;
 }
 
 function updateCharityGoalUI(totalRaised, goal) {
   const pct = goal > 0 ? Math.min(totalRaised / goal, 1) : 0;
-  document.getElementById('charity-pct').textContent = `${Math.round(pct * 100)}%`;
   document.getElementById('charity-amounts').textContent = `${charityFormatMoney(totalRaised)} / ${charityFormatMoney(goal)}`;
-  const CIRC = 264; // circumference of the charity circle's r=42
-  document.getElementById('charity-circle-fill').style.strokeDashoffset = CIRC - pct * CIRC;
+  document.getElementById('charity-fill').style.width = `${pct * 100}%`;
 }
 
 function updateCharityTimer(seconds) {
