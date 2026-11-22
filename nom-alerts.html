@@ -2383,6 +2383,12 @@ const THEME_OVERRIDES = {
       sub:    (u,a)  => a ? `$${parseFloat(a).toFixed(2)} — thank you! ✨` : '',
       color:  '#FFD700',
     },
+    treat: {
+      icon:   '🍰',
+      action: u      => `${u} sent a treat!`,
+      sub:    ()     => 'A magical treat arrives! ✨',
+      color:  '#FFD700',
+    },
     shoutout: {
       icon:   '🌟',
       action: u      => `Go show some love to ${u}!!!`,
@@ -2490,6 +2496,12 @@ const THEME_OVERRIDES = {
       sub:    (u,a)  => a ? `$${parseFloat(a).toFixed(2)} — trick or treat! 🍬` : '',
       color:  '#FF7518',
     },
+    treat: {
+      icon:   '🍬',
+      action: u      => `${u} sent a treat!`,
+      sub:    ()     => 'A spooky treat arrives! 🎃',
+      color:  '#FF7518',
+    },
     shoutout: {
       icon:   '🎃',
       action: u      => `Go show some love to ${u}!!!`,
@@ -2595,6 +2607,12 @@ const THEME_OVERRIDES = {
       icon:   '🎀',
       action: (u,a)  => `${u} left a gift for the neighborhood!`,
       sub:    (u,a)  => a ? `$${parseFloat(a).toFixed(2)} — thank you! 🎄` : '',
+      color:  '#F0C040',
+    },
+    treat: {
+      icon:   '🍭',
+      action: u      => `${u} sent a treat!`,
+      sub:    ()     => 'A festive treat arrives! 🎄',
       color:  '#F0C040',
     },
     shoutout: {
@@ -2812,6 +2830,14 @@ const CONFIGS = {
     action: (u,a)    => `${u} tipped $${parseFloat(a||5).toFixed(2)}!`,
     sub:    ()       => 'The bard tips their hat in gratitude.',
     color:  '#F0C060',
+    dur:    6000,
+  },
+  treat: {
+    icon:   '🍪',
+    label:  'Treat Sent',
+    action: u        => `${u} sent a treat!`,
+    sub:    ()       => 'A tasty treat arrives! 🍪',
+    color:  '#E89010',
     dur:    6000,
   },
   charity_donation: {
@@ -3058,6 +3084,7 @@ const SOUNDS = {
   bits:    'Assets/Sounds/Bits-sound.mp3',
   raid:    null,
   tip:     null,
+  treat:   null,
 };
 
 // Charity donation-tier sounds — fetched once, refreshed live if a mod

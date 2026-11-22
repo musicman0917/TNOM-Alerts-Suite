@@ -41,6 +41,14 @@ const BOT_SCOPES = ['user:read:chat', 'user:write:chat'].join(' ');
 const FOURTHWALL_USERNAME = process.env.FOURTHWALL_USERNAME || '';
 const FOURTHWALL_PASSWORD = process.env.FOURTHWALL_PASSWORD || '';
 
+// TreatStream OAuth client — optional. If unset, treat alerts just stay off.
+// Client ID/Secret come from TreatStream's own "Your OAuth Client" account
+// settings page, not from Twitch.
+const TREATSTREAM_CLIENT_ID     = process.env.TREATSTREAM_CLIENT_ID     || '';
+const TREATSTREAM_CLIENT_SECRET = process.env.TREATSTREAM_CLIENT_SECRET || '';
+const TREATSTREAM_REDIRECT_URI  = process.env.TREATSTREAM_REDIRECT_URI  || 'http://localhost:3010/treatstream-callback';
+const TREATSTREAM_TOKEN_FILE    = path.join(__dirname, '.treatstream-token.json');
+
 if (!CLIENT_SECRET) {
   console.error('FATAL: TWITCH_CLIENT_SECRET is not set. Add it to your .env file or PM2 environment.');
   process.exit(1);
@@ -2530,6 +2538,177 @@ const CHARITY_AUDIO_EXT_BY_MIME = {
   'audio/wave': 'wav', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/webm': 'webm',
 };
 
+// ─── TreatStream (real food/treat alerts) ───────────────────────────────────
+// TreatStream's "API key" (shown on their Account Settings page) is only for
+// their own hosted widget — the real-time feed needs a full OAuth2 app
+// (Client ID/Secret registered on the same settings page) plus a socket
+// token, then a Socket.IO connection to their (old-protocol) realtime server.
+let treatstreamTokenStore = { accessToken: null, refreshToken: null, expiresAt: 0 };
+let treatstreamOAuthState = null;
+
+function saveTreatstreamTokens() {
+  fs.writeFileSync(TREATSTREAM_TOKEN_FILE, JSON.stringify(treatstreamTokenStore, null, 2));
+}
+
+function loadTreatstreamTokens() {
+  if (fs.existsSync(TREATSTREAM_TOKEN_FILE)) {
+    try {
+      treatstreamTokenStore = JSON.parse(fs.readFileSync(TREATSTREAM_TOKEN_FILE, 'utf8'));
+      console.log('[treatstream] Loaded saved tokens from file');
+    } catch (e) {
+      console.log('[treatstream] Could not load token file');
+    }
+  }
+}
+
+function treatstreamPost(pathName, bodyObj) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(bodyObj);
+    const opts = {
+      hostname: 'treatstream.com',
+      path:     pathName,
+      method:   'POST',
+      headers:  { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    };
+    const req = https.request(opts, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+async function exchangeTreatstreamCode(code) {
+  const data = await treatstreamPost('/Oauth2/Authorize/token', {
+    code,
+    client_id:     TREATSTREAM_CLIENT_ID,
+    client_secret: TREATSTREAM_CLIENT_SECRET,
+    redirect_uri:  TREATSTREAM_REDIRECT_URI,
+    grant_type:    'authorization_code',
+    scope:         'userinfo',
+  });
+  if (data.access_token) {
+    treatstreamTokenStore.accessToken  = data.access_token;
+    treatstreamTokenStore.refreshToken = data.refresh_token;
+    treatstreamTokenStore.expiresAt    = Date.now() + (data.expires_in - 300) * 1000;
+    saveTreatstreamTokens();
+    console.log('[treatstream] Token exchanged and saved ✓');
+  } else {
+    throw new Error(JSON.stringify(data));
+  }
+}
+
+async function refreshTreatstreamToken() {
+  if (!treatstreamTokenStore.refreshToken) {
+    console.log('[treatstream] No refresh token — authorization required');
+    return false;
+  }
+  try {
+    const data = await treatstreamPost('/Oauth2/RefreshToken', {
+      client_id:     TREATSTREAM_CLIENT_ID,
+      client_secret: TREATSTREAM_CLIENT_SECRET,
+      refresh_token: treatstreamTokenStore.refreshToken,
+      grant_type:    'refresh_token',
+    });
+    if (data.access_token) {
+      treatstreamTokenStore.accessToken  = data.access_token;
+      treatstreamTokenStore.refreshToken = data.refresh_token || treatstreamTokenStore.refreshToken;
+      treatstreamTokenStore.expiresAt    = Date.now() + (data.expires_in - 300) * 1000;
+      saveTreatstreamTokens();
+      console.log('[treatstream] Token refreshed ✓');
+      return true;
+    }
+    console.log('[treatstream] Refresh failed:', JSON.stringify(data));
+    return false;
+  } catch (e) {
+    console.log('[treatstream] Refresh error:', e.message);
+    return false;
+  }
+}
+
+async function getValidTreatstreamToken() {
+  if (treatstreamTokenStore.accessToken && Date.now() < treatstreamTokenStore.expiresAt) {
+    return treatstreamTokenStore.accessToken;
+  }
+  const ok = await refreshTreatstreamToken();
+  return ok ? treatstreamTokenStore.accessToken : null;
+}
+
+// Auto-refresh 5 min before expiry — also renews the refresh token itself,
+// so this can run indefinitely without ever repeating the manual /treatstream-auth step.
+function scheduleTreatstreamRefresh() {
+  const msUntilExpiry = treatstreamTokenStore.expiresAt - Date.now();
+  const delay = Math.max(msUntilExpiry, 60000);
+  setTimeout(async () => {
+    await refreshTreatstreamToken();
+    scheduleTreatstreamRefresh();
+  }, delay);
+}
+
+let treatstreamSocket = null;
+let treatstreamReconnectMs = 5000;
+
+async function connectTreatstreamSocket() {
+  const accessToken = await getValidTreatstreamToken();
+  if (!accessToken) {
+    console.log(`[treatstream] Not authorized — visit http://${SERVER_IP}:${PORT}/treatstream-auth`);
+    return;
+  }
+  let socketToken;
+  try {
+    const data = await treatstreamPost('/Oauth2/Authorize/socketToken', {
+      client_id:    TREATSTREAM_CLIENT_ID,
+      access_token: accessToken,
+    });
+    socketToken = data.socket_token;
+  } catch (e) {
+    console.log('[treatstream] Could not get socket token:', e.message);
+  }
+  if (!socketToken) {
+    console.log('[treatstream] No socket token — retrying in', treatstreamReconnectMs, 'ms');
+    setTimeout(connectTreatstreamSocket, treatstreamReconnectMs);
+    treatstreamReconnectMs = Math.min(treatstreamReconnectMs * 1.5, 60000);
+    return;
+  }
+
+  if (treatstreamSocket) { try { treatstreamSocket.disconnect(); } catch (e) {} }
+
+  const io = require('socket.io-client');
+  treatstreamSocket = io('https://nodeapi.treatstream.com/', {
+    query: { token: socketToken },
+    reconnection: true,
+  });
+
+  treatstreamSocket.on('connect', () => {
+    console.log('[treatstream] Socket connected ✓');
+    treatstreamReconnectMs = 5000;
+  });
+
+  treatstreamSocket.on('realTimeTreat', (data) => {
+    console.log(`[treatstream] Treat received: ${data?.sender} → ${data?.title}`);
+    broadcastAlert({
+      type:     'treat',
+      username: data?.sender || 'Someone',
+      message:  data?.title || null,
+      _real:    true,
+    });
+  });
+
+  treatstreamSocket.on('disconnect', () => {
+    console.log('[treatstream] Socket disconnected');
+  });
+
+  treatstreamSocket.on('connect_error', (err) => {
+    console.log('[treatstream] Socket connect error:', err?.message || err);
+  });
+}
+
 // ─── HTTP Server ─────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   const parsed   = url.parse(req.url, true);
@@ -2686,6 +2865,71 @@ const server = http.createServer(async (req, res) => {
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'text/html' });
       res.end(`<h2>Bot token exchange failed: ${e.message}</h2>`);
+    }
+    return;
+  }
+
+  // ── GET /treatstream-auth ────────────────────────────────────
+  if (pathname === '/treatstream-auth') {
+    if (!TREATSTREAM_CLIENT_ID || !TREATSTREAM_CLIENT_SECRET) {
+      res.writeHead(400, { 'Content-Type': 'text/html' });
+      res.end('<h2>Set TREATSTREAM_CLIENT_ID / TREATSTREAM_CLIENT_SECRET first</h2>');
+      return;
+    }
+    treatstreamOAuthState = crypto.randomBytes(16).toString('hex');
+    const authUrl = new URL('https://treatstream.com/Oauth2/Authorize');
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('client_id',     TREATSTREAM_CLIENT_ID);
+    authUrl.searchParams.set('redirect_uri',  TREATSTREAM_REDIRECT_URI);
+    authUrl.searchParams.set('state',         treatstreamOAuthState);
+    authUrl.searchParams.set('scope',         '');
+    res.writeHead(302, { Location: authUrl.toString() });
+    res.end();
+    return;
+  }
+
+  // ── GET /treatstream-callback ────────────────────────────────
+  if (pathname === '/treatstream-callback') {
+    const code  = parsed.query.code;
+    const state = parsed.query.state;
+    const error = parsed.query.error;
+    if (error) {
+      res.writeHead(400, { 'Content-Type': 'text/html' });
+      res.end(`<h2>Authorization denied: ${error}</h2>`);
+      return;
+    }
+    if (!code) {
+      res.writeHead(400, { 'Content-Type': 'text/html' });
+      res.end('<h2>No code received</h2>');
+      return;
+    }
+    if (!treatstreamOAuthState || state !== treatstreamOAuthState) {
+      res.writeHead(400, { 'Content-Type': 'text/html' });
+      res.end('<h2>State mismatch — start over at /treatstream-auth</h2>');
+      return;
+    }
+    treatstreamOAuthState = null;
+    try {
+      await exchangeTreatstreamCode(code);
+      scheduleTreatstreamRefresh();
+      connectTreatstreamSocket();
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(`<!DOCTYPE html><html><head>
+        <style>
+          body { background:#180C04; color:#F2E4CC; font-family:serif;
+                 display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
+          .box { text-align:center; border:1px solid #B87820; padding:40px 60px; border-radius:4px; }
+          h2 { color:#E89010; font-size:22px; margin-bottom:12px; }
+          p  { color:#C0986A; font-style:italic; }
+        </style></head><body>
+        <div class="box">
+          <h2>♩ TreatStream Authorized! ♩</h2>
+          <p>Token saved. You can close this tab.</p>
+          <p style="margin-top:16px;font-size:13px;">nom-token-broker is running on port ${PORT}</p>
+        </div></body></html>`);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/html' });
+      res.end(`<h2>Token exchange failed: ${e.message}</h2>`);
     }
     return;
   }
@@ -4018,6 +4262,7 @@ loadIntegrations();
 loadModTimerState();
 loadCharityDonationTiers();
 loadCharityAssetImages();
+loadTreatstreamTokens();
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[nom-token-broker] Running on http://${SERVER_IP}:${PORT}`);
   if (tokenStore.refreshToken) {
@@ -4037,4 +4282,10 @@ server.listen(PORT, '0.0.0.0', () => {
   setInterval(pollAdSchedule, 60000);
   startFourthwallPolling();
   charityStartPolling();
+  if (treatstreamTokenStore.refreshToken) {
+    scheduleTreatstreamRefresh();
+    connectTreatstreamSocket();
+  } else if (TREATSTREAM_CLIENT_ID) {
+    console.log(`[treatstream] Not authorized yet — visit http://${SERVER_IP}:${PORT}/treatstream-auth on the server`);
+  }
 });

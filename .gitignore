@@ -20,6 +20,7 @@ node_modules/
 .charity-state.json
 .charity-donation-tiers.json
 .charity-asset-images.json
+.treatstream-token.json
 
 npm-debug.log*
 *.log
