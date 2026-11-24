@@ -163,6 +163,18 @@ function getGoalForAlertType(alertType) {
 // ─── Panic Button (Alerts Pause State) ───────────────────────────────────────
 let alertsPausedState = { paused: false };
 
+// Shared by the admin panel's panic button and the !panic/!unpanic chat
+// commands — the overlay itself clears its queue on the resulting
+// 'alerts-paused' SSE message, so there's nothing else to do here.
+function setAlertsPaused(paused) {
+  alertsPausedState.paused = !!paused;
+  const sse = `data: ${JSON.stringify({ type: 'alerts-paused', paused: alertsPausedState.paused })}\n\n`;
+  for (const client of sseClients) {
+    try { client.write(sse); } catch (e) { sseClients.delete(client); }
+  }
+  console.log(`[panic] Alerts ${alertsPausedState.paused ? 'PAUSED' : 'RESUMED'}`);
+}
+
 // ─── Social Config ────────────────────────────────────────────────────────────
 const SOCIAL_CONFIG_FILE = path.join(__dirname, '.social-config.json');
 let socialConfig = [
@@ -1892,6 +1904,23 @@ function routeTwitchEvent(subType, event) {
         break;
       }
 
+      // Mod/broadcaster commands: !panic (stop + clear all alerts) | !unpanic (resume)
+      // Meant for followbot raids — the overlay clears its queued alerts
+      // the moment it sees alerts-paused go true.
+      if (text === '!panic' || text === '!unpanic') {
+        if (!isChatMod(event)) {
+          console.log(`[panic] Ignored ${text} command from non-mod: ${event.chatter_user_name}`);
+          break;
+        }
+        const pausing = text === '!panic';
+        setAlertsPaused(pausing);
+        sendChatMessage(pausing
+          ? '🚨 Alerts stopped and the queue has been cleared.'
+          : '✅ Alerts resumed.');
+        console.log(`[panic] ${text} by ${event.chatter_user_name}`);
+        break;
+      }
+
       // Mod/broadcaster commands: !add <user> [song] | !remove/!kick <user> | !next/!skip | !clearq/!clearqueue
       if (text.startsWith('!add ')) {
         if (!isChatMod(event)) {
@@ -3058,12 +3087,7 @@ const server = http.createServer(async (req, res) => {
     req.on('end', () => {
       try {
         const { paused } = JSON.parse(body);
-        alertsPausedState.paused = !!paused;
-        const sse = `data: ${JSON.stringify({ type: 'alerts-paused', paused: alertsPausedState.paused })}\n\n`;
-        for (const client of sseClients) {
-          try { client.write(sse); } catch(e) { sseClients.delete(client); }
-        }
-        console.log(`[panic] Alerts ${alertsPausedState.paused ? 'PAUSED' : 'RESUMED'}`);
+        setAlertsPaused(paused);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, paused: alertsPausedState.paused }));
       } catch(e) {
