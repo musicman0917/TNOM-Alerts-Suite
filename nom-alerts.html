@@ -1588,11 +1588,17 @@ function updateTopLeftWidgetsVisibility() {
   const goalWidget = document.getElementById('goal-widget');
   const goalVisible = goalWidget && goalWidget.style.display !== 'none';
   const anyHealthVisible = healthEnabled.steps || healthEnabled.water;
-  if (!goalVisible && !anyHealthVisible) {
+  const hidden = !goalVisible && !anyHealthVisible;
+  if (hidden) {
     container.style.display = 'none';
   } else {
     container.style.display = '';
   }
+
+  // Charity box sits below that panel normally — when it's hidden, move
+  // charity up to take the top-left corner instead of leaving a gap.
+  const charityWidget = document.getElementById('charity-widget');
+  if (charityWidget) charityWidget.style.top = hidden ? '30px' : '285px';
 }
 
 function applyHealthSettings(settings) {
