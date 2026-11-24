@@ -1233,17 +1233,25 @@
   }
   .circle-fill.pulse { animation: goalPulse 1s ease-in-out 3; }
 
+  /* Own small box — separate from #top-left-widgets so it isn't sized by
+     the much bigger goal circle / health bars sharing that panel. */
   #charity-widget {
+    position: fixed;
+    top: 285px; left: 30px;
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
+    gap: 6px;
+    background: linear-gradient(155deg, #2A1508, #180C04);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px;
     pointer-events: none;
+    box-shadow: 0 4px 24px rgba(0,0,0,.6);
   }
-  #charity-icon { font-size: 11px; line-height: 1; }
-  #charity-bar-row { width: 45px; height: 4px; }
-  #charity-amounts { font-size: 8px; margin: 0; white-space: nowrap; }
+  #charity-icon { font-size: 13px; line-height: 1; }
+  #charity-bar-row { width: 50px; height: 5px; }
+  #charity-amounts { font-size: 11px; margin: 0; white-space: nowrap; }
   .health-fill.charity { background: linear-gradient(to right, #8B1838, #E8749A); }
 
 </style>
@@ -1297,16 +1305,16 @@
     </div>
   </div>
 
-  <!-- Charity Donothon -->
-  <div id="charity-widget">
-    <span id="charity-icon">💝</span>
-    <div class="health-track" id="charity-bar-row">
-      <div class="health-fill charity" id="charity-fill"></div>
-    </div>
-    <span class="health-bar-value" id="charity-amounts">$0 / $0</span>
-  </div>
-
 </div><!-- end #top-left-widgets -->
+
+<!-- Charity Donothon — own box, not inside #top-left-widgets -->
+<div id="charity-widget">
+  <span id="charity-icon">💝</span>
+  <div class="health-track" id="charity-bar-row">
+    <div class="health-fill charity" id="charity-fill"></div>
+  </div>
+  <span class="health-bar-value" id="charity-amounts">$0 / $0</span>
+</div>
 
 <!-- ── Hype Train Widget ── -->
 <div id="hype-train-widget">
@@ -1580,9 +1588,7 @@ function updateTopLeftWidgetsVisibility() {
   const goalWidget = document.getElementById('goal-widget');
   const goalVisible = goalWidget && goalWidget.style.display !== 'none';
   const anyHealthVisible = healthEnabled.steps || healthEnabled.water;
-  const charityWidget = document.getElementById('charity-widget');
-  const charityVisible = charityWidget && charityWidget.style.display !== 'none';
-  if (!goalVisible && !anyHealthVisible && !charityVisible) {
+  if (!goalVisible && !anyHealthVisible) {
     container.style.display = 'none';
   } else {
     container.style.display = '';
@@ -3671,8 +3677,7 @@ function updateCharityGoalUI(totalRaised, goal) {
 
 function setCharityWidgetVisible(visible) {
   const widget = document.getElementById('charity-widget');
-  if (widget) widget.style.display = visible ? '' : 'none';
-  updateTopLeftWidgetsVisibility();
+  if (widget) widget.style.display = visible ? 'flex' : 'none';
 }
 
 // Kept minimal: instead of sitting on screen permanently, the widget pops
